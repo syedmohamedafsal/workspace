@@ -4,10 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rebs/core/config/app_config.dart';
 import 'package:rebs/core/database/app_database.dart';
+import 'package:rebs/core/error/failures.dart';
+import 'package:rebs/core/location/location_models.dart';
+import 'package:rebs/core/location/location_service.dart';
 import 'package:rebs/core/network/network_info.dart';
 import 'package:rebs/core/sync/sync_manager.dart';
 import 'package:rebs/core/sync/sync_queue_datasource.dart';
 import 'package:rebs/core/sync/sync_status.dart';
+import 'package:rebs/core/time/company_clock.dart';
 import 'package:rebs/features/hrms/attendance/data/datasources/attendance_local_datasource.dart';
 import 'package:rebs/features/hrms/attendance/data/datasources/attendance_remote_datasource.dart';
 import 'package:rebs/features/hrms/attendance/data/models/attendance_record_model.dart';
@@ -46,11 +50,12 @@ void main() {
   late MockAttendanceRemoteDataSource remoteDataSource;
   late ToggleNetworkInfo networkInfo;
   late SyncManager syncManager;
+  late GeolocatorLocationService locationService;
   late AttendanceRepositoryImpl repository;
-  late DateTime clockTime;
+  late DateTime utcClockTime;
 
   setUp(() async {
-    clockTime = DateTime(2026, 11, 18, 9, 15);
+    utcClockTime = DateTime.utc(2026, 11, 18, 3, 45); // 09:15 IST
     db = AppDatabase(
       databaseFactoryOverride: databaseFactoryFfi,
       pathOverride: inMemoryDatabasePath,
@@ -64,11 +69,18 @@ void main() {
     networkInfo = ToggleNetworkInfo();
     const config = AppConfig();
 
+    locationService = GeolocatorLocationService(
+      employeeConfig: config.employeeConfig,
+      initialSimulation: const LocationSimulationState(
+        mode: LocationSimulationMode.insideOffice,
+      ),
+    );
+
     syncManager = SyncManager(
       queueDataSource: queueDataSource,
       networkInfo: networkInfo,
       config: config,
-      clock: () => clockTime,
+      clock: () => utcClockTime,
     );
 
     syncManager.registerHandler(
@@ -84,37 +96,113 @@ void main() {
       remoteDataSource: remoteDataSource,
       networkInfo: networkInfo,
       syncManager: syncManager,
+      locationService: locationService,
+      companyClock: CompanyClock(utcClock: () => utcClockTime),
       config: config,
-      clock: () => clockTime,
     );
   });
 
   tearDown(() async {
+    await locationService.dispose();
     await syncManager.dispose();
     await networkInfo.dispose();
     await db.close();
   });
 
-  test('offline check-in and check-out persist locally and sync in order online',
+  test('check-out without check-in is rejected', () async {
+    final result = await repository.checkOut();
+    expect(result.isFailure, isTrue);
+    expect(result.failureOrNull, isA<ValidationFailure>());
+  });
+
+  test('rejects attendance outside 200m geofence with meaningful message',
       () async {
-    // 1. Check in while offline
-    final checkInResult = await repository.checkIn(workLocation: 'Office');
+    locationService.updateSimulation(
+      const LocationSimulationState(mode: LocationSimulationMode.outsideOffice),
+    );
+
+    final result = await repository.checkIn();
+    expect(result.isFailure, isTrue);
+    expect(result.failureOrNull, isA<OutsideGeofenceFailure>());
+    expect(result.failureOrNull!.message, contains('200m'));
+    expect(result.failureOrNull!.message, contains('Teqbae Innovations, Kochi'));
+  });
+
+  test('handles denied, permanently denied, and unavailable location states',
+      () async {
+    locationService.updateSimulation(
+      const LocationSimulationState(
+        mode: LocationSimulationMode.permissionDenied,
+      ),
+    );
+    expect(
+      (await repository.checkIn()).failureOrNull,
+      isA<LocationPermissionDeniedFailure>(),
+    );
+
+    locationService.updateSimulation(
+      const LocationSimulationState(
+        mode: LocationSimulationMode.permissionPermanentlyDenied,
+      ),
+    );
+    expect(
+      (await repository.checkIn()).failureOrNull,
+      isA<LocationPermissionPermanentlyDeniedFailure>(),
+    );
+
+    locationService.updateSimulation(
+      const LocationSimulationState(
+        mode: LocationSimulationMode.locationUnavailable,
+      ),
+    );
+    expect(
+      (await repository.checkIn()).failureOrNull,
+      isA<LocationUnavailableFailure>(),
+    );
+  });
+
+  test('rapid concurrent taps do not create duplicate attendance events',
+      () async {
+    final results = await Future.wait([
+      repository.checkIn(workLocation: 'Teqbae Innovations, Kochi'),
+      repository.checkIn(workLocation: 'Teqbae Innovations, Kochi'),
+      repository.checkIn(workLocation: 'Teqbae Innovations, Kochi'),
+    ]);
+
+    final successes = results.where((r) => r.isSuccess).toList();
+    expect(successes.length, 1);
+
+    final counts = await queueDataSource.getCounts();
+    expect(counts.pending, 1);
+  });
+
+  test(
+      'offline check-in and check-out capture GPS, persist locally, and sync in order online',
+      () async {
+    // 1. Check in while offline inside 200m
+    final checkInResult =
+        await repository.checkIn(workLocation: 'Teqbae Innovations, Kochi');
     expect(checkInResult.isSuccess, isTrue);
     final checkedIn = checkInResult.dataOrNull!;
     expect(checkedIn.isCheckedIn, isTrue);
     expect(checkedIn.syncStatus, RecordSyncStatus.pending);
+    expect(checkedIn.checkInLatitude, isNotNull);
+    expect(checkedIn.checkInLongitude, isNotNull);
+    expect(checkedIn.checkInDistanceMeters, lessThanOrEqualTo(200));
 
     // 2. Duplicate check-in on the same day is blocked
-    final duplicate = await repository.checkIn(workLocation: 'Office');
+    final duplicate = await repository.checkIn();
     expect(duplicate.isFailure, isTrue);
 
     // 3. Check out later while still offline
-    clockTime = DateTime(2026, 11, 18, 17, 45);
+    utcClockTime = DateTime.utc(2026, 11, 18, 12, 15); // 17:45 IST
     final checkOutResult = await repository.checkOut(note: 'Done for the day');
     expect(checkOutResult.isSuccess, isTrue);
     final checkedOut = checkOutResult.dataOrNull!;
     expect(checkedOut.isCompleted, isTrue);
     expect(checkedOut.syncStatus, RecordSyncStatus.pending);
+    expect(checkedOut.checkOutLatitude, isNotNull);
+    expect(checkedOut.checkOutLongitude, isNotNull);
 
     // Verify 2 queued mutations exist in SQLite outbox
     final counts = await queueDataSource.getCounts();
@@ -169,10 +257,11 @@ void main() {
     networkInfo.goOnline();
     await syncedDone;
 
-    // Check-out payload must have inherited server_id returned by check-in!
+    // Check-out payload carries server_id from check-in + captured coordinates
     expect(capturedCheckOutPayload?['server_id'], 'srv-att-42');
+    expect(capturedCheckOutPayload?['latitude'], isNotNull);
+    expect(capturedCheckOutPayload?['longitude'], isNotNull);
 
-    // Local record is now synced with serverId
     final todayAfterSync = await repository.getTodayAttendance();
     expect(todayAfterSync.dataOrNull?.syncStatus, RecordSyncStatus.synced);
     expect(todayAfterSync.dataOrNull?.serverId, 'srv-att-42');

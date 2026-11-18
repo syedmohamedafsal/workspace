@@ -30,10 +30,12 @@ import '../../features/hrms/leave/domain/usecases/get_leave_requests.dart';
 import '../../features/hrms/leave/presentation/bloc/leave_bloc.dart';
 import '../config/app_config.dart';
 import '../database/app_database.dart';
+import '../location/location_service.dart';
 import '../network/api_client.dart';
 import '../network/network_info.dart';
 import '../sync/sync_manager.dart';
 import '../sync/sync_queue_datasource.dart';
+import '../time/company_clock.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -43,10 +45,18 @@ Future<void> initDependencies({
   AppDatabase? databaseOverride,
   NetworkInfo? networkInfoOverride,
   AuthRepository? authRepositoryOverride,
+  LocationService? locationServiceOverride,
+  CompanyClock? companyClockOverride,
 }) async {
   // Core
   sl.registerSingleton<AppConfig>(config);
   sl.registerSingleton<AppDatabase>(databaseOverride ?? AppDatabase());
+  sl.registerSingleton<CompanyClock>(companyClockOverride ?? CompanyClock());
+  sl.registerLazySingleton<LocationService>(
+    () =>
+        locationServiceOverride ??
+        GeolocatorLocationService(employeeConfig: sl<AppConfig>().employeeConfig),
+  );
   sl.registerLazySingleton<Connectivity>(() => Connectivity());
   sl.registerLazySingleton<NetworkInfo>(
     () => networkInfoOverride ?? NetworkInfoImpl(sl()),
@@ -137,6 +147,9 @@ void _registerAttendanceModule() {
       remoteDataSource: sl(),
       networkInfo: sl(),
       syncManager: sl(),
+      locationService: sl(),
+      authLocalDataSource: sl(),
+      companyClock: sl(),
       config: sl(),
     ),
   );

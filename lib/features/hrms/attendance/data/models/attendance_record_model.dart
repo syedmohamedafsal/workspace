@@ -17,6 +17,12 @@ class AttendanceRecordModel extends AttendanceRecord {
     super.checkInNote,
     super.checkOutNote,
     super.workLocation,
+    super.checkInLatitude,
+    super.checkInLongitude,
+    super.checkInDistanceMeters,
+    super.checkOutLatitude,
+    super.checkOutLongitude,
+    super.checkOutDistanceMeters,
     super.syncError,
   });
 
@@ -31,6 +37,12 @@ class AttendanceRecordModel extends AttendanceRecord {
       checkInNote: entity.checkInNote,
       checkOutNote: entity.checkOutNote,
       workLocation: entity.workLocation,
+      checkInLatitude: entity.checkInLatitude,
+      checkInLongitude: entity.checkInLongitude,
+      checkInDistanceMeters: entity.checkInDistanceMeters,
+      checkOutLatitude: entity.checkOutLatitude,
+      checkOutLongitude: entity.checkOutLongitude,
+      checkOutDistanceMeters: entity.checkOutDistanceMeters,
       status: entity.status,
       syncStatus: entity.syncStatus,
       syncError: entity.syncError,
@@ -54,6 +66,14 @@ class AttendanceRecordModel extends AttendanceRecord {
       checkInNote: map['check_in_note'] as String?,
       checkOutNote: map['check_out_note'] as String?,
       workLocation: map['work_location'] as String?,
+      checkInLatitude: (map['check_in_latitude'] as num?)?.toDouble(),
+      checkInLongitude: (map['check_in_longitude'] as num?)?.toDouble(),
+      checkInDistanceMeters:
+          (map['check_in_distance_meters'] as num?)?.toDouble(),
+      checkOutLatitude: (map['check_out_latitude'] as num?)?.toDouble(),
+      checkOutLongitude: (map['check_out_longitude'] as num?)?.toDouble(),
+      checkOutDistanceMeters:
+          (map['check_out_distance_meters'] as num?)?.toDouble(),
       status: AttendanceStatus.fromString(map['status'] as String),
       syncStatus: RecordSyncStatus.fromString(map['sync_status'] as String),
       syncError: map['sync_error'] as String?,
@@ -79,6 +99,14 @@ class AttendanceRecordModel extends AttendanceRecord {
       checkInNote: json['check_in_note'] as String?,
       checkOutNote: json['check_out_note'] as String?,
       workLocation: json['work_location'] as String?,
+      checkInLatitude: (json['check_in_latitude'] as num?)?.toDouble(),
+      checkInLongitude: (json['check_in_longitude'] as num?)?.toDouble(),
+      checkInDistanceMeters:
+          (json['check_in_distance_meters'] as num?)?.toDouble(),
+      checkOutLatitude: (json['check_out_latitude'] as num?)?.toDouble(),
+      checkOutLongitude: (json['check_out_longitude'] as num?)?.toDouble(),
+      checkOutDistanceMeters:
+          (json['check_out_distance_meters'] as num?)?.toDouble(),
       status: AttendanceStatus.fromString(
         (json['status'] as String?) ?? AttendanceStatus.checkedIn.name,
       ),
@@ -103,6 +131,12 @@ class AttendanceRecordModel extends AttendanceRecord {
       'check_in_note': checkInNote,
       'check_out_note': checkOutNote,
       'work_location': workLocation,
+      'check_in_latitude': checkInLatitude,
+      'check_in_longitude': checkInLongitude,
+      'check_in_distance_meters': checkInDistanceMeters,
+      'check_out_latitude': checkOutLatitude,
+      'check_out_longitude': checkOutLongitude,
+      'check_out_distance_meters': checkOutDistanceMeters,
       'status': status.name,
       'sync_status': syncStatus.name,
       'sync_error': syncError,
@@ -111,24 +145,36 @@ class AttendanceRecordModel extends AttendanceRecord {
     };
   }
 
-  Map<String, dynamic> toCheckInPayload() {
+  Map<String, dynamic> toCheckInPayload({required String companyTimezone}) {
     return {
       'client_id': localId,
       'employee_id': employeeId,
+      'event_type': 'check_in',
       'date': formatDateKey(date),
+      'timestamp': checkInAt?.toUtc().toIso8601String(),
       'check_in_at': checkInAt?.toIso8601String(),
+      'latitude': checkInLatitude,
+      'longitude': checkInLongitude,
+      'distance_meters': checkInDistanceMeters,
+      'company_timezone': companyTimezone,
       'work_location': workLocation,
       'note': checkInNote,
     };
   }
 
-  Map<String, dynamic> toCheckOutPayload() {
+  Map<String, dynamic> toCheckOutPayload({required String companyTimezone}) {
     return {
       'client_id': localId,
       'server_id': serverId,
       'employee_id': employeeId,
+      'event_type': 'check_out',
       'date': formatDateKey(date),
+      'timestamp': checkOutAt?.toUtc().toIso8601String(),
       'check_out_at': checkOutAt?.toIso8601String(),
+      'latitude': checkOutLatitude,
+      'longitude': checkOutLongitude,
+      'distance_meters': checkOutDistanceMeters,
+      'company_timezone': companyTimezone,
       'note': checkOutNote,
     };
   }

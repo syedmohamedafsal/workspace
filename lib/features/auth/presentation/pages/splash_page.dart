@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,8 +8,8 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 
-/// Application launch screen that restores or initializes the preconfigured
-/// employee session and navigates directly to the Employee Dashboard.
+/// Application launch screen featuring the official TEQBAE brand logo while
+/// restoring or initializing the preconfigured employee session.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -17,6 +18,9 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
+  static const Color _brandDark = Color(0xFF0A0B0D);
+  static const Color _brandEmerald = Color(0xFF22B57D);
+
   @override
   void initState() {
     super.initState();
@@ -29,95 +33,86 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
-    return BlocConsumer<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is AuthAuthenticated) {
-          context.go(AppRoutes.dashboard);
-        }
-      },
-      builder: (context, state) {
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E3A8A),
-                        borderRadius: BorderRadius.circular(16),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: BlocConsumer<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is AuthAuthenticated) {
+            context.go(AppRoutes.dashboard);
+          }
+        },
+        builder: (context, state) {
+          return Scaffold(
+            backgroundColor: _brandDark,
+            body: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/teqbae_logo.png',
+                        height: 54,
+                        fit: BoxFit.contain,
                       ),
-                      child: const Text(
-                        'R',
+                      const SizedBox(height: 16),
+                      const Text(
+                        'REBS',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 3.2,
+                          color: _brandEmerald,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'REBS',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: const Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'HRMS Employee Workspace',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    switch (state) {
-                      AuthError(:final message) => _SplashErrorSection(
-                          message: message,
-                          onRetry: () => context
-                              .read<AuthBloc>()
-                              .add(const AuthSessionRetryRequested()),
+                      const SizedBox(height: 4),
+                      Text(
+                        'HRMS Employee Workspace',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF9CA3AF),
                         ),
-                      AuthInitial() ||
-                      AuthLoading() ||
-                      AuthAuthenticated() =>
-                        Column(
-                          children: [
-                            SizedBox(
-                              width: 26,
-                              height: 26,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.6,
-                                color: scheme.primary,
+                      ),
+                      const SizedBox(height: 36),
+                      switch (state) {
+                        AuthError(:final message) => _SplashErrorSection(
+                            message: message,
+                            onRetry: () => context
+                                .read<AuthBloc>()
+                                .add(const AuthSessionRetryRequested()),
+                          ),
+                        AuthInitial() ||
+                        AuthLoading() ||
+                        AuthAuthenticated() =>
+                          Column(
+                            children: [
+                              const SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.6,
+                                  color: _brandEmerald,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Initializing workspace...',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF6B7280),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Initializing workspace...',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFF9CA3AF),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                    },
-                  ],
+                            ],
+                          ),
+                      },
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -133,45 +128,52 @@ class _SplashErrorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Card(
-      color: scheme.errorContainer.withValues(alpha: 0.45),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: scheme.error,
-              size: 32,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Initialization Failed',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: scheme.onErrorContainer,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onErrorContainer,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F2937),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFEF4444).withValues(alpha: 0.45),
         ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Color(0xFFF87171),
+            size: 32,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Initialization Failed',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFFD1D5DB),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF22B57D),
+              foregroundColor: const Color(0xFF0A0B0D),
+            ),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }

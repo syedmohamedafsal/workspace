@@ -34,8 +34,18 @@ class AuthRepositoryImpl implements AuthRepository {
       final persisted = await _localDataSource.getActiveSession();
 
       if (persisted != null && persisted.isValid) {
+        final refreshedEmployee = persisted.employee.copyWith(
+          officeId: _employeeConfig.officeId,
+          officeName: _employeeConfig.officeName,
+          officeLatitude: _employeeConfig.officeLatitude,
+          officeLongitude: _employeeConfig.officeLongitude,
+          companyTimezone: _employeeConfig.companyTimezone,
+        );
         final restored = EmployeeSessionModel.fromEntity(
-          persisted.copyWith(lastRestoredAt: now),
+          persisted.copyWith(
+            employee: refreshedEmployee,
+            lastRestoredAt: now,
+          ),
         );
         await _localDataSource.saveSession(restored);
         return Success(restored);

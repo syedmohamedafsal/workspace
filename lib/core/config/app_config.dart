@@ -17,6 +17,7 @@ class AppConfig {
     this.maxSyncRetries = 5,
     this.baseRetryDelay = const Duration(seconds: 5),
     this.maxRetryDelay = const Duration(minutes: 5),
+    this.allowedAttendanceRadiusMeters = 200.0,
     this.employeeConfig = const PreconfiguredEmployeeConfig(),
   });
 
@@ -26,6 +27,7 @@ class AppConfig {
   final int maxSyncRetries;
   final Duration baseRetryDelay;
   final Duration maxRetryDelay;
+  final double allowedAttendanceRadiusMeters;
 
   /// Preconfigured employee, office coordinates, and company timezone settings.
   final PreconfiguredEmployeeConfig employeeConfig;

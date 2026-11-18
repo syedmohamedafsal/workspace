@@ -44,7 +44,7 @@ void main() {
     expect(restored, equals(firstSession));
     expect(restored?.employee.employeeId, 'REBS001');
     expect(restored?.employee.employeeName, 'Syed Mohamed Afsal');
-    expect(restored?.employee.officeName, 'REBS Chennai Office');
+    expect(restored?.employee.officeName, 'Teqbae Innovations, Kochi');
 
     // Replace with updated timestamp
     final updatedSession = EmployeeSessionModel.fromEntity(

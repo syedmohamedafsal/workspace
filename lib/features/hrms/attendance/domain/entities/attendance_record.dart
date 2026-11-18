@@ -16,7 +16,8 @@ enum AttendanceStatus {
   }
 }
 
-/// Core domain entity representing a single day's employee attendance log.
+/// Core domain entity representing a single working day's attendance log,
+/// including captured GPS coordinates and office distance metrics.
 class AttendanceRecord extends Equatable {
   const AttendanceRecord({
     required this.localId,
@@ -32,6 +33,12 @@ class AttendanceRecord extends Equatable {
     this.checkInNote,
     this.checkOutNote,
     this.workLocation,
+    this.checkInLatitude,
+    this.checkInLongitude,
+    this.checkInDistanceMeters,
+    this.checkOutLatitude,
+    this.checkOutLongitude,
+    this.checkOutDistanceMeters,
     this.syncError,
   });
 
@@ -39,13 +46,19 @@ class AttendanceRecord extends Equatable {
   final String? serverId;
   final String employeeId;
 
-  /// Calendar date normalized to `YYYY-MM-DD` (midnight local time).
+  /// Calendar date normalized to `YYYY-MM-DD` in the company timezone.
   final DateTime date;
   final DateTime? checkInAt;
   final DateTime? checkOutAt;
   final String? checkInNote;
   final String? checkOutNote;
   final String? workLocation;
+  final double? checkInLatitude;
+  final double? checkInLongitude;
+  final double? checkInDistanceMeters;
+  final double? checkOutLatitude;
+  final double? checkOutLongitude;
+  final double? checkOutDistanceMeters;
   final AttendanceStatus status;
   final RecordSyncStatus syncStatus;
   final String? syncError;
@@ -73,6 +86,12 @@ class AttendanceRecord extends Equatable {
     String? checkInNote,
     String? checkOutNote,
     String? workLocation,
+    double? checkInLatitude,
+    double? checkInLongitude,
+    double? checkInDistanceMeters,
+    double? checkOutLatitude,
+    double? checkOutLongitude,
+    double? checkOutDistanceMeters,
     AttendanceStatus? status,
     RecordSyncStatus? syncStatus,
     String? syncError,
@@ -90,6 +109,14 @@ class AttendanceRecord extends Equatable {
       checkInNote: checkInNote ?? this.checkInNote,
       checkOutNote: checkOutNote ?? this.checkOutNote,
       workLocation: workLocation ?? this.workLocation,
+      checkInLatitude: checkInLatitude ?? this.checkInLatitude,
+      checkInLongitude: checkInLongitude ?? this.checkInLongitude,
+      checkInDistanceMeters:
+          checkInDistanceMeters ?? this.checkInDistanceMeters,
+      checkOutLatitude: checkOutLatitude ?? this.checkOutLatitude,
+      checkOutLongitude: checkOutLongitude ?? this.checkOutLongitude,
+      checkOutDistanceMeters:
+          checkOutDistanceMeters ?? this.checkOutDistanceMeters,
       status: status ?? this.status,
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: clearSyncError ? null : (syncError ?? this.syncError),
@@ -109,6 +136,12 @@ class AttendanceRecord extends Equatable {
         checkInNote,
         checkOutNote,
         workLocation,
+        checkInLatitude,
+        checkInLongitude,
+        checkInDistanceMeters,
+        checkOutLatitude,
+        checkOutLongitude,
+        checkOutDistanceMeters,
         status,
         syncStatus,
         syncError,

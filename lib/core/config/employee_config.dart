@@ -1,21 +1,24 @@
 /// Configurable defaults for the preconfigured REBS employee session.
 ///
+/// Defaults point to **Teqbae Innovations & Solutions**
+/// (AKL Heights, Seaport-Airport Road, Thrikkakara, Kakkanad, Kochi).
+///
 /// Coordinates and company timezone can be overridden at build/run time via
 /// `--dart-define`:
 /// ```bash
 /// flutter run \
-///   --dart-define=OFFICE_LATITUDE=13.0827 \
-///   --dart-define=OFFICE_LONGITUDE=80.2707 \
+///   --dart-define=OFFICE_LATITUDE=10.0159 \
+///   --dart-define=OFFICE_LONGITUDE=76.3419 \
 ///   --dart-define=COMPANY_TIMEZONE=Asia/Kolkata
 /// ```
 class PreconfiguredEmployeeConfig {
   const PreconfiguredEmployeeConfig({
     this.employeeId = 'REBS001',
     this.employeeName = 'Syed Mohamed Afsal',
-    this.department = 'Engineering',
+    this.department = 'Flutter Developer',
     this.designation = 'Flutter Developer',
     this.officeId = 'OFFICE001',
-    this.officeName = 'REBS Chennai Office',
+    this.officeName = 'Teqbae Innovations, Kochi',
     double? officeLatitude,
     double? officeLongitude,
     this.companyTimezone = const String.fromEnvironment(
@@ -27,16 +30,16 @@ class PreconfiguredEmployeeConfig {
 
   static const String _envOfficeLatitude = String.fromEnvironment(
     'OFFICE_LATITUDE',
-    defaultValue: '13.0827',
+    defaultValue: '10.0159',
   );
 
   static const String _envOfficeLongitude = String.fromEnvironment(
     'OFFICE_LONGITUDE',
-    defaultValue: '80.2707',
+    defaultValue: '76.3419',
   );
 
-  static const double _fallbackLatitude = 13.0827;
-  static const double _fallbackLongitude = 80.2707;
+  static const double _fallbackLatitude = 10.0159;
+  static const double _fallbackLongitude = 76.3419;
 
   final String employeeId;
   final String employeeName;

@@ -23,12 +23,12 @@ void main() {
         employee: const EmployeeModel(
           employeeId: 'REBS001',
           employeeName: 'Syed Mohamed Afsal',
-          department: 'Engineering',
+          department: 'Flutter Developer',
           designation: 'Flutter Developer',
           officeId: 'OFFICE001',
-          officeName: 'REBS Chennai Office',
-          officeLatitude: 13.0827,
-          officeLongitude: 80.2707,
+          officeName: 'Teqbae Innovations, Kochi',
+          officeLatitude: 10.0159,
+          officeLongitude: 76.3419,
           companyTimezone: 'Asia/Kolkata',
         ),
         initializedAt: DateTime(2026, 11, 18, 9, 0),
@@ -40,8 +40,8 @@ void main() {
   setUp(() {
     localDataSource = MockAuthLocalDataSource();
     employeeConfig = const PreconfiguredEmployeeConfig(
-      officeLatitude: 13.0827,
-      officeLongitude: 80.2707,
+      officeLatitude: 10.0159,
+      officeLongitude: 76.3419,
       companyTimezone: 'Asia/Kolkata',
     );
     currentTime = DateTime(2026, 11, 18, 9, 30);
@@ -65,14 +65,14 @@ void main() {
     final session = result.dataOrNull!;
     expect(session.isValid, isTrue);
     expect(session.sessionId, isNotEmpty);
-    expect(session.employee.employeeId, 'REBS001');
-    expect(session.employee.employeeName, 'Syed Mohamed Afsal');
-    expect(session.employee.department, 'Engineering');
-    expect(session.employee.designation, 'Flutter Developer');
+    expect(session.employee.employeeId, employeeConfig.employeeId);
+    expect(session.employee.employeeName, employeeConfig.employeeName);
+    expect(session.employee.department, employeeConfig.department);
+    expect(session.employee.designation, employeeConfig.designation);
     expect(session.employee.officeId, 'OFFICE001');
-    expect(session.employee.officeName, 'REBS Chennai Office');
-    expect(session.employee.officeLatitude, 13.0827);
-    expect(session.employee.officeLongitude, 80.2707);
+    expect(session.employee.officeName, 'Teqbae Innovations, Kochi');
+    expect(session.employee.officeLatitude, 10.0159);
+    expect(session.employee.officeLongitude, 76.3419);
     expect(session.employee.companyTimezone, 'Asia/Kolkata');
     expect(session.initializedAt, currentTime);
     expect(session.lastRestoredAt, currentTime);

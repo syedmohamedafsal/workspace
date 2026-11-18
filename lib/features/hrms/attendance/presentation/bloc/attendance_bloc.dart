@@ -47,6 +47,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
   StreamSubscription<SyncSnapshot>? _syncSubscription;
   bool _wasSyncing = false;
+  DateTime? _lastCheckInSuccessAt;
+  DateTime? _lastCheckOutSuccessAt;
+
+  static const Duration _doubleTapGuardWindow = Duration(seconds: 2);
 
   Future<void> _onLoadAttendance(
     LoadAttendanceRequested event,
@@ -66,6 +70,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         state.copyWith(
           status: AttendanceViewStatus.failure,
           errorMessage: todayResult.failureOrNull?.message,
+          lastFailure: todayResult.failureOrNull,
         ),
       );
       return;
@@ -76,6 +81,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         state.copyWith(
           status: AttendanceViewStatus.failure,
           errorMessage: historyResult.failureOrNull?.message,
+          lastFailure: historyResult.failureOrNull,
         ),
       );
       return;
@@ -97,6 +103,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckInSubmitted event,
     Emitter<AttendanceState> emit,
   ) async {
+    // Ignore repeated taps while submitting or queued immediately after success.
+    if (state.status == AttendanceViewStatus.submitting) return;
+    if (_lastCheckInSuccessAt != null &&
+        DateTime.now().difference(_lastCheckInSuccessAt!) <
+            _doubleTapGuardWindow) {
+      return;
+    }
+
     emit(
       state.copyWith(
         status: AttendanceViewStatus.submitting,
@@ -111,15 +125,20 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
     await result.fold(
       onSuccess: (record) async {
+        _lastCheckInSuccessAt = DateTime.now();
         final historyResult = await _getAttendanceHistory(
           const GetAttendanceHistoryParams(),
         );
+        final dist = record.checkInDistanceMeters != null
+            ? ' (${record.checkInDistanceMeters!.round()}m from office)'
+            : '';
         emit(
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             todayRecord: record,
             history: historyResult.dataOrNull ?? state.history,
-            feedbackMessage: 'Checked in successfully.',
+            feedbackMessage: 'Checked in successfully$dist.',
+            feedbackSequence: state.feedbackSequence + 1,
           ),
         );
       },
@@ -128,6 +147,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             errorMessage: failure.message,
+            lastFailure: failure,
+            feedbackSequence: state.feedbackSequence + 1,
           ),
         );
       },
@@ -138,6 +159,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     CheckOutSubmitted event,
     Emitter<AttendanceState> emit,
   ) async {
+    // Ignore repeated taps while submitting or queued immediately after success.
+    if (state.status == AttendanceViewStatus.submitting) return;
+    if (_lastCheckOutSuccessAt != null &&
+        DateTime.now().difference(_lastCheckOutSuccessAt!) <
+            _doubleTapGuardWindow) {
+      return;
+    }
+
     emit(
       state.copyWith(
         status: AttendanceViewStatus.submitting,
@@ -150,15 +179,20 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
     await result.fold(
       onSuccess: (record) async {
+        _lastCheckOutSuccessAt = DateTime.now();
         final historyResult = await _getAttendanceHistory(
           const GetAttendanceHistoryParams(),
         );
+        final dist = record.checkOutDistanceMeters != null
+            ? ' (${record.checkOutDistanceMeters!.round()}m from office)'
+            : '';
         emit(
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             todayRecord: record,
             history: historyResult.dataOrNull ?? state.history,
-            feedbackMessage: 'Checked out successfully.',
+            feedbackMessage: 'Checked out successfully$dist.',
+            feedbackSequence: state.feedbackSequence + 1,
           ),
         );
       },
@@ -167,6 +201,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             errorMessage: failure.message,
+            lastFailure: failure,
+            feedbackSequence: state.feedbackSequence + 1,
           ),
         );
       },
