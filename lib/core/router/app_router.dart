@@ -2,9 +2,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/accounts/presentation/pages/accounts_placeholder_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/crm/presentation/pages/crm_placeholder_page.dart';
 import '../../features/hrms/attendance/presentation/bloc/attendance_bloc.dart';
 import '../../features/hrms/attendance/presentation/pages/attendance_page.dart';
+import '../../features/hrms/dashboard/presentation/pages/employee_dashboard_placeholder_page.dart';
 import '../../features/hrms/leave/presentation/bloc/leave_bloc.dart';
 import '../../features/hrms/leave/presentation/pages/leave_page.dart';
 import '../di/injection_container.dart';
@@ -12,6 +15,9 @@ import '../sync/sync_manager.dart';
 import '../widgets/app_shell_scaffold.dart';
 
 abstract final class AppRoutes {
+  static const String splash = '/splash';
+  static const String login = '/login';
+  static const String dashboard = '/hrms/dashboard';
   static const String attendance = '/hrms/attendance';
   static const String leave = '/hrms/leave';
   static const String crm = '/crm';
@@ -20,8 +26,20 @@ abstract final class AppRoutes {
 
 GoRouter createAppRouter() {
   return GoRouter(
-    initialLocation: AppRoutes.attendance,
+    initialLocation: AppRoutes.splash,
     routes: [
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        builder: (context, state) => const LoginPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.dashboard,
+        builder: (context, state) => const EmployeeDashboardPlaceholderPage(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShellScaffold(

@@ -55,6 +55,8 @@ class AppDatabase {
   Future<void> _onCreate(Database db, int version) async {
     final batch = db.batch();
 
+    batch.execute(_createEmployeeSessionsTableSql);
+
     batch.execute('''
       CREATE TABLE ${DbConstants.tableAttendance} (
         local_id TEXT PRIMARY KEY,
@@ -164,8 +166,28 @@ class AppDatabase {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Future schema migrations go here incrementally by version.
+    if (oldVersion < 2) {
+      await db.execute(_createEmployeeSessionsTableSql);
+    }
   }
+
+  static const String _createEmployeeSessionsTableSql = '''
+      CREATE TABLE IF NOT EXISTS ${DbConstants.tableEmployeeSessions} (
+        session_id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        department TEXT NOT NULL,
+        designation TEXT NOT NULL,
+        office_id TEXT NOT NULL,
+        office_name TEXT NOT NULL,
+        office_latitude REAL NOT NULL,
+        office_longitude REAL NOT NULL,
+        company_timezone TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        initialized_at TEXT NOT NULL,
+        last_restored_at TEXT NOT NULL
+      )
+    ''';
 
   Future<void> close() async {
     final db = _database;

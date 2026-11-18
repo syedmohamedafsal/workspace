@@ -1,3 +1,5 @@
+import 'employee_config.dart';
+
 /// Application-wide configuration for the REBS platform.
 ///
 /// Values can be overridden at build/run time using `--dart-define`:
@@ -15,8 +17,7 @@ class AppConfig {
     this.maxSyncRetries = 5,
     this.baseRetryDelay = const Duration(seconds: 5),
     this.maxRetryDelay = const Duration(minutes: 5),
-    this.defaultEmployeeId = 'EMP-1001',
-    this.defaultEmployeeName = 'Afsal Mohamed',
+    this.employeeConfig = const PreconfiguredEmployeeConfig(),
   });
 
   final String apiBaseUrl;
@@ -26,7 +27,9 @@ class AppConfig {
   final Duration baseRetryDelay;
   final Duration maxRetryDelay;
 
-  /// Temporary active employee context until the Auth feature is integrated.
-  final String defaultEmployeeId;
-  final String defaultEmployeeName;
+  /// Preconfigured employee, office coordinates, and company timezone settings.
+  final PreconfiguredEmployeeConfig employeeConfig;
+
+  String get defaultEmployeeId => employeeConfig.employeeId;
+  String get defaultEmployeeName => employeeConfig.employeeName;
 }

@@ -1,9 +1,10 @@
 /// SQLite database schema constants for offline-first persistence.
 abstract final class DbConstants {
   static const String databaseName = 'rebs_offline.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
 
   // Tables
+  static const String tableEmployeeSessions = 'employee_sessions';
   static const String tableAttendance = 'attendance_records';
   static const String tableLeaveRequests = 'leave_requests';
   static const String tableLeaveBalances = 'leave_balances';

@@ -1,6 +1,14 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../features/auth/data/datasources/auth_local_datasource.dart';
+import '../../features/auth/data/repositories/auth_repository_impl.dart';
+import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/domain/usecases/clear_employee_session.dart';
+import '../../features/auth/domain/usecases/initialize_employee_session.dart';
+import '../../features/auth/domain/usecases/restore_employee_session.dart';
+import '../../features/auth/domain/usecases/sign_in_employee.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/hrms/attendance/data/datasources/attendance_local_datasource.dart';
 import '../../features/hrms/attendance/data/datasources/attendance_remote_datasource.dart';
 import '../../features/hrms/attendance/data/repositories/attendance_repository_impl.dart';
@@ -35,6 +43,7 @@ Future<void> initDependencies({
   AppConfig config = const AppConfig(),
   AppDatabase? databaseOverride,
   NetworkInfo? networkInfoOverride,
+  AuthRepository? authRepositoryOverride,
 }) async {
   // Core
   sl.registerSingleton<AppConfig>(config);
@@ -55,6 +64,9 @@ Future<void> initDependencies({
     ),
   );
 
+  // Module: Authentication & Employee Session
+  _registerAuthModule(authRepositoryOverride: authRepositoryOverride);
+
   // Module: HRMS - Attendance
   _registerAttendanceModule();
 
@@ -66,6 +78,39 @@ Future<void> initDependencies({
   syncManager.registerHandler(sl<AttendanceSyncHandler>());
   syncManager.registerHandler(sl<LeaveSyncHandler>());
   await syncManager.initialize();
+}
+
+void _registerAuthModule({AuthRepository? authRepositoryOverride}) {
+  // Data sources
+  sl.registerLazySingleton<AuthLocalDataSource>(
+    () => AuthLocalDataSourceImpl(sl()),
+  );
+
+  // Repository
+  sl.registerLazySingleton<AuthRepository>(
+    () =>
+        authRepositoryOverride ??
+        AuthRepositoryImpl(
+          localDataSource: sl(),
+          employeeConfig: sl<AppConfig>().employeeConfig,
+        ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => SignInEmployee(sl()));
+  sl.registerLazySingleton(() => InitializeEmployeeSession(sl()));
+  sl.registerLazySingleton(() => RestoreEmployeeSession(sl()));
+  sl.registerLazySingleton(() => ClearEmployeeSession(sl()));
+
+  // Presentation BLoC
+  sl.registerFactory(
+    () => AuthBloc(
+      signInEmployee: sl(),
+      initializeEmployeeSession: sl(),
+      restoreEmployeeSession: sl(),
+      clearEmployeeSession: sl(),
+    ),
+  );
 }
 
 void _registerAttendanceModule() {
