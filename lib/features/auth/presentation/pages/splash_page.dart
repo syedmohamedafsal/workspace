@@ -7,8 +7,8 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 
-/// Application launch screen that checks for a persisted employee session and
-/// routes to either the Employee Dashboard or the REBS Login screen.
+/// Application launch screen that restores or initializes the preconfigured
+/// employee session and navigates directly to the Employee Dashboard.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -22,7 +22,7 @@ class _SplashPageState extends State<SplashPage> {
     super.initState();
     final authBloc = context.read<AuthBloc>();
     if (authBloc.state is AuthInitial) {
-      authBloc.add(const AuthSessionRestoreRequested());
+      authBloc.add(const AuthSessionInitializeRequested());
     }
   }
 
@@ -35,12 +35,11 @@ class _SplashPageState extends State<SplashPage> {
       listener: (context, state) {
         if (state is AuthAuthenticated) {
           context.go(AppRoutes.dashboard);
-        } else if (state is AuthUnauthenticated) {
-          context.go(AppRoutes.login);
         }
       },
       builder: (context, state) {
         return Scaffold(
+          backgroundColor: Colors.white,
           body: SafeArea(
             child: Center(
               child: Padding(
@@ -49,35 +48,39 @@ class _SplashPageState extends State<SplashPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 76,
-                      height: 76,
+                      width: 64,
+                      height: 64,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: scheme.primary,
-                        borderRadius: BorderRadius.circular(20),
+                        color: const Color(0xFF1E3A8A),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(
-                        Icons.workspaces_rounded,
-                        size: 40,
-                        color: scheme.onPrimary,
+                      child: const Text(
+                        'R',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
                     Text(
                       'REBS',
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                        color: scheme.primary,
+                        letterSpacing: 1.2,
+                        color: const Color(0xFF111827),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       'HRMS Employee Workspace',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                        color: const Color(0xFF6B7280),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 32),
                     switch (state) {
                       AuthError(:final message) => _SplashErrorSection(
                           message: message,
@@ -87,20 +90,22 @@ class _SplashPageState extends State<SplashPage> {
                         ),
                       AuthInitial() ||
                       AuthLoading() ||
-                      AuthAuthenticated() ||
-                      AuthUnauthenticated() =>
+                      AuthAuthenticated() =>
                         Column(
                           children: [
-                            const SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: CircularProgressIndicator(strokeWidth: 2.8),
+                            SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.6,
+                                color: scheme.primary,
+                              ),
                             ),
                             const SizedBox(height: 14),
                             Text(
                               'Initializing workspace...',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
+                                color: const Color(0xFF6B7280),
                               ),
                             ),
                           ],

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rebs/app.dart';
@@ -47,7 +46,7 @@ void main() {
   }
 
   testWidgets(
-      'routes Splash -> Login when no session exists, allows Demo sign-in to Dashboard, and persists session',
+      'launches on Splash, initializes preconfigured employee, persists session, and navigates to Dashboard',
       (WidgetTester tester) async {
     await tester.runAsync(() async {
       await sl.reset();
@@ -63,30 +62,15 @@ void main() {
     await tester.pumpWidget(const RebsApp());
     await pumpAfterDbIo(tester);
 
-    // No persisted session -> lands on REBS Login screen
-    expect(find.text('Welcome back'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Continue as Demo Employee'), findsOneWidget);
-
-    // Tap Demo Employee -> persists session and navigates to Dashboard
-    await tester.ensureVisible(find.text('Continue as Demo Employee'));
-    await tester.tap(find.text('Continue as Demo Employee'));
-    await pumpAfterDbIo(tester);
-
     expect(find.text('Employee Dashboard - Coming Soon'), findsOneWidget);
 
-    // Verify session was persisted in SQLite
+    // Verify preconfigured employee session was persisted in SQLite
     final restored = await tester.runAsync(
       () => sl<AuthRepository>().restoreSession(),
     );
     expect(restored?.isSuccess, isTrue);
     expect(restored?.dataOrNull?.employee.employeeId, 'REBS001');
     expect(restored?.dataOrNull?.employee.employeeName, 'Syed Mohamed Afsal');
-
-    // Sign out returns cleanly to Login
-    await tester.tap(find.byIcon(Icons.logout_rounded));
-    await pumpAfterDbIo(tester);
-    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets(
@@ -111,7 +95,7 @@ void main() {
       lastRestoredAt: DateTime(2026, 11, 18, 9, 0),
     );
 
-    when(() => mockAuthRepo.restoreSession()).thenAnswer((_) async {
+    when(() => mockAuthRepo.initializeSession()).thenAnswer((_) async {
       attempts++;
       if (attempts == 1) {
         return const FailureResult(CacheFailure('Storage read error'));

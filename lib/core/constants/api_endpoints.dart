@@ -1,5 +1,8 @@
 /// Centralized REST API endpoints for all REBS modules.
 abstract final class ApiEndpoints {
+  // Employee & Office Configuration
+  static const String employeeMe = '/employee/me';
+
   // HRMS - Attendance
   static const String attendanceBase = '/hrms/attendance';
   static const String attendanceCheckIn = '/hrms/attendance/check-in';

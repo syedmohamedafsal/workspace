@@ -28,59 +28,6 @@ class AuthRepositoryImpl implements AuthRepository {
   final DateTime Function() _clock;
 
   @override
-  Future<Result<EmployeeSession>> signIn({
-    required String employeeId,
-    required String password,
-  }) async {
-    try {
-      final normalizedId = employeeId.trim().toUpperCase();
-      if (normalizedId.isEmpty) {
-        return const FailureResult(
-          ValidationFailure('Employee ID cannot be empty.'),
-        );
-      }
-      if (password.trim().length < 4) {
-        return const FailureResult(
-          ValidationFailure('Password must be at least 4 characters.'),
-        );
-      }
-
-      final now = _clock();
-      final baseEmployee = EmployeeModel.fromConfig(_employeeConfig);
-      final employee = normalizedId == _employeeConfig.employeeId.toUpperCase()
-          ? baseEmployee
-          : EmployeeModel.fromEntity(
-              baseEmployee.copyWith(employeeId: normalizedId),
-            );
-
-      if (!employee.hasValidIdentity) {
-        return const FailureResult(
-          ValidationFailure(
-            'Employee configuration is invalid. Please contact support.',
-          ),
-        );
-      }
-
-      final session = EmployeeSessionModel(
-        sessionId: _uuid.v4(),
-        employee: employee,
-        initializedAt: now,
-        lastRestoredAt: now,
-        isActive: true,
-      );
-
-      await _localDataSource.saveSession(session);
-      return Success(session);
-    } on CacheException catch (e) {
-      return FailureResult(CacheFailure(e.message));
-    } catch (e) {
-      return FailureResult(
-        UnexpectedFailure('Failed to sign in: $e'),
-      );
-    }
-  }
-
-  @override
   Future<Result<EmployeeSession>> initializeSession() async {
     try {
       final now = _clock();

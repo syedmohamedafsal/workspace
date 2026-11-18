@@ -7,7 +7,6 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/clear_employee_session.dart';
 import '../../features/auth/domain/usecases/initialize_employee_session.dart';
 import '../../features/auth/domain/usecases/restore_employee_session.dart';
-import '../../features/auth/domain/usecases/sign_in_employee.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/hrms/attendance/data/datasources/attendance_local_datasource.dart';
 import '../../features/hrms/attendance/data/datasources/attendance_remote_datasource.dart';
@@ -97,7 +96,6 @@ void _registerAuthModule({AuthRepository? authRepositoryOverride}) {
   );
 
   // Use cases
-  sl.registerLazySingleton(() => SignInEmployee(sl()));
   sl.registerLazySingleton(() => InitializeEmployeeSession(sl()));
   sl.registerLazySingleton(() => RestoreEmployeeSession(sl()));
   sl.registerLazySingleton(() => ClearEmployeeSession(sl()));
@@ -105,7 +103,6 @@ void _registerAuthModule({AuthRepository? authRepositoryOverride}) {
   // Presentation BLoC
   sl.registerFactory(
     () => AuthBloc(
-      signInEmployee: sl(),
       initializeEmployeeSession: sl(),
       restoreEmployeeSession: sl(),
       clearEmployeeSession: sl(),

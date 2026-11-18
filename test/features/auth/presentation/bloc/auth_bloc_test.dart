@@ -9,12 +9,9 @@ import 'package:rebs/features/auth/domain/entities/employee_session.dart';
 import 'package:rebs/features/auth/domain/usecases/clear_employee_session.dart';
 import 'package:rebs/features/auth/domain/usecases/initialize_employee_session.dart';
 import 'package:rebs/features/auth/domain/usecases/restore_employee_session.dart';
-import 'package:rebs/features/auth/domain/usecases/sign_in_employee.dart';
 import 'package:rebs/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rebs/features/auth/presentation/bloc/auth_event.dart';
 import 'package:rebs/features/auth/presentation/bloc/auth_state.dart';
-
-class MockSignInEmployee extends Mock implements SignInEmployee {}
 
 class MockInitializeEmployeeSession extends Mock
     implements InitializeEmployeeSession {}
@@ -25,7 +22,6 @@ class MockRestoreEmployeeSession extends Mock
 class MockClearEmployeeSession extends Mock implements ClearEmployeeSession {}
 
 void main() {
-  late MockSignInEmployee signInUseCase;
   late MockInitializeEmployeeSession initializeUseCase;
   late MockRestoreEmployeeSession restoreUseCase;
   late MockClearEmployeeSession clearUseCase;
@@ -49,20 +45,15 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(const NoParams());
-    registerFallbackValue(
-      const SignInEmployeeParams(employeeId: 'REBS001', password: 'password'),
-    );
   });
 
   setUp(() {
-    signInUseCase = MockSignInEmployee();
     initializeUseCase = MockInitializeEmployeeSession();
     restoreUseCase = MockRestoreEmployeeSession();
     clearUseCase = MockClearEmployeeSession();
   });
 
   AuthBloc buildBloc() => AuthBloc(
-        signInEmployee: signInUseCase,
         initializeEmployeeSession: initializeUseCase,
         restoreEmployeeSession: restoreUseCase,
         clearEmployeeSession: clearUseCase,
@@ -75,80 +66,7 @@ void main() {
   });
 
   blocTest<AuthBloc, AuthState>(
-    'emits [AuthLoading, AuthAuthenticated] when persisted session is restored',
-    build: () {
-      when(() => restoreUseCase(any()))
-          .thenAnswer((_) async => Success(testSession));
-      return buildBloc();
-    },
-    act: (bloc) => bloc.add(const AuthSessionRestoreRequested()),
-    expect: () => [
-      const AuthLoading(),
-      AuthAuthenticated(testSession),
-    ],
-  );
-
-  blocTest<AuthBloc, AuthState>(
-    'emits [AuthLoading, AuthUnauthenticated] when no persisted session exists',
-    build: () {
-      when(() => restoreUseCase(any()))
-          .thenAnswer((_) async => const Success(null));
-      return buildBloc();
-    },
-    act: (bloc) => bloc.add(const AuthSessionRestoreRequested()),
-    expect: () => [
-      const AuthLoading(),
-      const AuthUnauthenticated(),
-    ],
-  );
-
-  blocTest<AuthBloc, AuthState>(
-    'emits [AuthLoading, AuthError] on restore failure, then recovers on retry',
-    build: () {
-      var attempt = 0;
-      when(() => restoreUseCase(any())).thenAnswer((_) async {
-        attempt++;
-        if (attempt == 1) {
-          return const FailureResult(CacheFailure('Local database failed'));
-        }
-        return Success(testSession);
-      });
-      return buildBloc();
-    },
-    act: (bloc) async {
-      bloc.add(const AuthSessionRestoreRequested());
-      await Future<void>.delayed(Duration.zero);
-      bloc.add(const AuthSessionRetryRequested());
-    },
-    expect: () => [
-      const AuthLoading(),
-      const AuthError('Local database failed'),
-      const AuthLoading(),
-      AuthAuthenticated(testSession),
-    ],
-  );
-
-  blocTest<AuthBloc, AuthState>(
-    'emits [AuthLoading, AuthAuthenticated] on credential sign-in',
-    build: () {
-      when(() => signInUseCase(any()))
-          .thenAnswer((_) async => Success(testSession));
-      return buildBloc();
-    },
-    act: (bloc) => bloc.add(
-      const AuthSessionSignInRequested(
-        employeeId: 'REBS001',
-        password: 'password123',
-      ),
-    ),
-    expect: () => [
-      const AuthLoading(),
-      AuthAuthenticated(testSession),
-    ],
-  );
-
-  blocTest<AuthBloc, AuthState>(
-    'emits [AuthLoading, AuthAuthenticated] on one-tap demo employee sign-in',
+    'emits [AuthLoading, AuthAuthenticated] on successful session initialization',
     build: () {
       when(() => initializeUseCase(any()))
           .thenAnswer((_) async => Success(testSession));
@@ -162,7 +80,47 @@ void main() {
   );
 
   blocTest<AuthBloc, AuthState>(
-    'clears session and transitions to AuthUnauthenticated',
+    'emits [AuthLoading, AuthError] on initialization failure, then recovers on retry',
+    build: () {
+      var attempt = 0;
+      when(() => initializeUseCase(any())).thenAnswer((_) async {
+        attempt++;
+        if (attempt == 1) {
+          return const FailureResult(CacheFailure('Local database failed'));
+        }
+        return Success(testSession);
+      });
+      return buildBloc();
+    },
+    act: (bloc) async {
+      bloc.add(const AuthSessionInitializeRequested());
+      await Future<void>.delayed(Duration.zero);
+      bloc.add(const AuthSessionRetryRequested());
+    },
+    expect: () => [
+      const AuthLoading(),
+      const AuthError('Local database failed'),
+      const AuthLoading(),
+      AuthAuthenticated(testSession),
+    ],
+  );
+
+  blocTest<AuthBloc, AuthState>(
+    'restores existing session into AuthAuthenticated',
+    build: () {
+      when(() => restoreUseCase(any()))
+          .thenAnswer((_) async => Success(testSession));
+      return buildBloc();
+    },
+    act: (bloc) => bloc.add(const AuthSessionRestoreRequested()),
+    expect: () => [
+      const AuthLoading(),
+      AuthAuthenticated(testSession),
+    ],
+  );
+
+  blocTest<AuthBloc, AuthState>(
+    'clears session and returns to AuthInitial',
     build: () {
       when(() => clearUseCase(any()))
           .thenAnswer((_) async => const Success(null));
@@ -172,7 +130,7 @@ void main() {
     act: (bloc) => bloc.add(const AuthSessionClearRequested()),
     expect: () => [
       const AuthLoading(),
-      const AuthUnauthenticated(),
+      const AuthInitial(),
     ],
   );
 }

@@ -157,25 +157,4 @@ void main() {
     expect(result.failureOrNull, isA<CacheFailure>());
     expect(result.failureOrNull?.message, 'Database unavailable');
   });
-
-  test('signIn validates inputs and persists employee session locally',
-      () async {
-    when(() => localDataSource.saveSession(any())).thenAnswer((_) async {});
-
-    final invalidResult = await repository.signIn(
-      employeeId: 'REBS001',
-      password: '12',
-    );
-    expect(invalidResult.isFailure, isTrue);
-    expect(invalidResult.failureOrNull, isA<ValidationFailure>());
-
-    final successResult = await repository.signIn(
-      employeeId: 'rebs001',
-      password: 'password123',
-    );
-    expect(successResult.isSuccess, isTrue);
-    expect(successResult.dataOrNull?.employee.employeeId, 'REBS001');
-    expect(successResult.dataOrNull?.employee.employeeName, 'Syed Mohamed Afsal');
-    verify(() => localDataSource.saveSession(any())).called(1);
-  });
 }

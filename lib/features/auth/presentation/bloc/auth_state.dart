@@ -26,10 +26,6 @@ final class AuthAuthenticated extends AuthState {
   List<Object?> get props => [session];
 }
 
-final class AuthUnauthenticated extends AuthState {
-  const AuthUnauthenticated();
-}
-
 final class AuthError extends AuthState {
   const AuthError(this.message);
 
