@@ -24,7 +24,6 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   static const Color _brandDark = Color(0xFF0A0B0D);
-  static const Color _brandEmerald = Color(0xFF22B57D);
 
   Timer? _splashTimer;
   bool _timerElapsed = false;
@@ -74,8 +73,6 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: BlocConsumer<AuthBloc, AuthState>(
@@ -99,54 +96,15 @@ class _SplashPageState extends State<SplashPage> {
                         height: 54,
                         fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'TEQBAE WORKSPACE',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2.5,
-                          color: _brandEmerald,
+                      if (state is AuthError) ...[
+                        const SizedBox(height: 24),
+                        _SplashErrorSection(
+                          message: state.message,
+                          onRetry: () => context
+                              .read<AuthBloc>()
+                              .add(const AuthSessionRetryRequested()),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'HRMS Employee Workspace',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      switch (state) {
-                        AuthError(:final message) => _SplashErrorSection(
-                            message: message,
-                            onRetry: () => context
-                                .read<AuthBloc>()
-                                .add(const AuthSessionRetryRequested()),
-                          ),
-                        AuthInitial() ||
-                        AuthLoading() ||
-                        AuthAuthenticated() =>
-                          Column(
-                            children: [
-                              const SizedBox(
-                                width: 26,
-                                height: 26,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.6,
-                                  color: _brandEmerald,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                'Initializing workspace...',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: const Color(0xFF9CA3AF),
-                                ),
-                              ),
-                            ],
-                          ),
-                      },
+                      ],
                     ],
                   ),
                 ),
