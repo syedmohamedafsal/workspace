@@ -59,11 +59,11 @@ class _SplashPageState extends State<SplashPage> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'REBS',
+                        'TEQBAE WORKSPACE',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 3.2,
+                          letterSpacing: 2.5,
                           color: _brandEmerald,
                         ),
                       ),

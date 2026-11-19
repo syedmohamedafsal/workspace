@@ -197,7 +197,7 @@ void main() {
     await tester.pumpWidget(const RebsApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('REBS'), findsOneWidget);
+    expect(find.text('TEQBAE WORKSPACE'), findsOneWidget);
     expect(find.text('Initialization Failed'), findsOneWidget);
     expect(find.text('Storage read error'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);

@@ -16,7 +16,7 @@ class RebsModulesPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
       children: [
         const Text(
-          'REBS Platform Modules',
+          'Teqbae Platform Modules',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,

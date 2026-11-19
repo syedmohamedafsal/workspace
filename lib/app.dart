@@ -34,7 +34,7 @@ class _RebsAppState extends State<RebsApp> {
     return BlocProvider<AuthBloc>(
       create: (_) => sl<AuthBloc>(),
       child: MaterialApp.router(
-        title: 'REBS',
+        title: 'Teqbae Workspace',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: _router,
