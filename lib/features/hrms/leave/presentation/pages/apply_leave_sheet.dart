@@ -51,11 +51,18 @@ class _ApplyLeaveSheetState extends State<ApplyLeaveSheet> {
   Future<void> _pickDate({required bool isStart}) async {
     final today = DateTime.now();
     final minDate = DateTime(today.year, today.month, today.day);
+    final startDateOnly =
+        DateTime(_startDate.year, _startDate.month, _startDate.day);
+
+    // End date can only be picked on or after the selected start date
+    final firstDate = isStart ? minDate : startDateOnly;
     final initial = isStart ? _startDate : _endDate;
+    final initialDate = initial.isBefore(firstDate) ? firstDate : initial;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(minDate) ? minDate : initial,
-      firstDate: minDate,
+      initialDate: initialDate,
+      firstDate: firstDate,
       lastDate: minDate.add(const Duration(days: 365)),
     );
     if (picked == null) return;
@@ -73,6 +80,18 @@ class _ApplyLeaveSheetState extends State<ApplyLeaveSheet> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    final start = DateTime(_startDate.year, _startDate.month, _startDate.day);
+    final end = DateTime(_endDate.year, _endDate.month, _endDate.day);
+    if (end.isBefore(start)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End date must be on or after start date.'),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pop(
       ApplyLeaveFormResult(
         leaveType: _leaveType,

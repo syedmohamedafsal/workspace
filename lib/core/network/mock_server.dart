@@ -373,10 +373,18 @@ class MockHttpServer {
       }
 
       // 7. Cancel Leave Application
-      final cancelMatch =
-          RegExp(r'^/leave/requests/([^/]+)/cancel$').firstMatch(path);
-      if (method == 'POST' && cancelMatch != null) {
-        final leaveId = cancelMatch.group(1)!;
+      final cancelMatch = RegExp(
+        r'^(?:/hrms)?/leave/requests/([^/]+)/cancel/?$',
+        caseSensitive: false,
+      ).firstMatch(path);
+      final deleteLeaveMatch = RegExp(
+        r'^(?:/hrms)?/leave/requests/([^/]+)/?$',
+        caseSensitive: false,
+      ).firstMatch(path);
+
+      if ((method == 'POST' && cancelMatch != null) ||
+          (method == 'DELETE' && deleteLeaveMatch != null)) {
+        final leaveId = (cancelMatch ?? deleteLeaveMatch)!.group(1)!;
         await _handleLeaveCancellation(request, leaveId);
         return;
       }
