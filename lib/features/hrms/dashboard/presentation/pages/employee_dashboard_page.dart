@@ -119,15 +119,19 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                       attendanceState.todayRecord == null;
 
               if (isInitialLoading) {
-                return const _DashboardLoadingView();
+                return const SafeArea(
+                  child: _DashboardLoadingView(),
+                );
               }
 
               if (attendanceState.status == AttendanceViewStatus.failure &&
                   attendanceState.history.isEmpty) {
-                return _DashboardErrorState(
-                  message: attendanceState.errorMessage ??
-                      'Unable to load dashboard data.',
-                  onRetry: () => _loadData(),
+                return SafeArea(
+                  child: _DashboardErrorState(
+                    message: attendanceState.errorMessage ??
+                        'Unable to load dashboard data.',
+                    onRetry: () => _loadData(),
+                  ),
                 );
               }
 
@@ -142,14 +146,18 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                 LeaveType.casual,
               );
 
-              return RefreshIndicator(
-                onRefresh: () async => _loadData(refreshRemote: true),
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 28),
-                  children: [
-                    // Curved blue top header + overlapping office & check-in/out card
-                    _TopHeaderAndOverviewStack(
-                      employee: employee,
+              return SafeArea(
+                bottom: false,
+                child: Container(
+                  color: AppTheme.background,
+                  child: RefreshIndicator(
+                    onRefresh: () async => _loadData(refreshRemote: true),
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 28),
+                      children: [
+                        // Curved blue top header + overlapping office & check-in/out card
+                        _TopHeaderAndOverviewStack(
+                          employee: employee,
                       officeName: officeName,
                       officeLatitude: officeLat,
                       officeLongitude: officeLng,
@@ -291,8 +299,10 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                     ),
                   ],
                 ),
-              );
-            },
+              ),
+            ),
+          );
+        },
           );
         },
       ),
@@ -376,7 +386,6 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
     final companyNow = sl<CompanyClock>().nowInTimezone(companyTimezone);
     final dateLabel = DateFormat('d MMMM yyyy').format(companyNow);
     final timeFmt = DateFormat('hh:mm');
@@ -421,7 +430,7 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
           top: 0,
           left: 0,
           right: 0,
-          height: topPadding + 245,
+          height: 245,
           child: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -440,12 +449,10 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
             ),
           ),
         ),
-        // Foreground content inside SafeArea
-        SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(
+        // Foreground content safely inside SafeArea
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Row 1: Official TEQBAE brand logo + Online / Sync pill
@@ -783,7 +790,6 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                 ),
               ),
             ],
-          ),
           ),
         ),
       ],

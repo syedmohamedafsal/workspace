@@ -30,6 +30,9 @@ class AppShellScaffold extends StatelessWidget {
     final isDashboardTab = currentIndex == 0;
 
     return Scaffold(
+      backgroundColor: isDashboardTab
+          ? const Color(0xFF1575C8)
+          : AppTheme.background,
       appBar: isDashboardTab
           ? null
           : AppBar(
@@ -124,7 +127,10 @@ class AppShellScaffold extends StatelessWidget {
               ],
             ),
       body: isDashboardTab
-          ? navigationShell
+          ? SafeArea(
+              bottom: false,
+              child: navigationShell,
+            )
           : Column(
               children: [
                 SyncStatusBanner(syncManager: syncManager),
