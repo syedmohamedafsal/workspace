@@ -304,6 +304,16 @@ class MockHttpServer {
     }
 
     try {
+      // 0. Health Check
+      if (method == 'GET' && (path == '/health' || path == '/')) {
+        await _sendJson(request, {
+          'status': 'ok',
+          'service': 'REBS Mock Server',
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+        });
+        return;
+      }
+
       // 1. Employee Me
       if (method == 'GET' && path == '/employee/me') {
         await _sendJson(request, {'data': _employee, ..._employee});
