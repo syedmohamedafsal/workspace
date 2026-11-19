@@ -13,8 +13,23 @@ abstract final class AttendanceDialogs {
     required String employeeName,
     required String companyTimezone,
     DateTime? checkInAt,
+    DateTime? checkOutAt,
     Duration? workedDuration,
+    String? officeName,
   }) {
+    if (checkOutAt != null) {
+      showAttendanceCompletedDialog(
+        context: context,
+        employeeName: employeeName,
+        companyTimezone: companyTimezone,
+        checkInAt: checkInAt,
+        checkOutAt: checkOutAt,
+        workedDuration: workedDuration,
+        officeName: officeName,
+      );
+      return Future.value(null);
+    }
+
     final companyNow =
         CompanyClock.toCompanyTimezone(DateTime.now(), companyTimezone);
 
@@ -31,6 +46,32 @@ abstract final class AttendanceDialogs {
         initialIsOfficeHoursOver: autoIsOfficeHoursOver,
         checkInAt: checkInAt,
         workedDuration: workedDuration,
+      ),
+    );
+  }
+
+  /// Displays a completed attendance summary popup when the employee has both
+  /// checked in and checked out for today. Action buttons are hidden, and the
+  /// dialog displays check-in time, check-out time, and total worked duration.
+  static Future<void> showAttendanceCompletedDialog({
+    required BuildContext context,
+    required String employeeName,
+    DateTime? checkInAt,
+    DateTime? checkOutAt,
+    Duration? workedDuration,
+    String companyTimezone = 'Asia/Kolkata',
+    String? officeName,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _AttendanceCompletedDialog(
+        employeeName: employeeName,
+        checkInAt: checkInAt,
+        checkOutAt: checkOutAt,
+        workedDuration: workedDuration,
+        companyTimezone: companyTimezone,
+        officeName: officeName ?? 'Teqbae Innovations',
       ),
     );
   }
@@ -681,6 +722,383 @@ class _CheckInWelcomeDialog extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttendanceCompletedDialog extends StatelessWidget {
+  const _AttendanceCompletedDialog({
+    required this.employeeName,
+    this.checkInAt,
+    this.checkOutAt,
+    this.workedDuration,
+    required this.companyTimezone,
+    required this.officeName,
+  });
+
+  final String employeeName;
+  final DateTime? checkInAt;
+  final DateTime? checkOutAt;
+  final Duration? workedDuration;
+  final String companyTimezone;
+  final String officeName;
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
+    final local = CompanyClock.toCompanyTimezone(dt, companyTimezone);
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final amPm = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $amPm';
+  }
+
+  String _formatDuration(Duration d) {
+    final hours = d.inHours.toString().padLeft(2, '0');
+    final minutes = (d.inMinutes % 60).toString().padLeft(2, '0');
+    return '${hours}h ${minutes}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final firstName = AttendanceDialogs.extractFirstName(employeeName);
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
+    // Calculate effective worked duration
+    final effectiveDuration = workedDuration ??
+        ((checkInAt != null && checkOutAt != null)
+            ? checkOutAt!.difference(checkInAt!)
+            : Duration.zero);
+
+    final durationFormatted = _formatDuration(effectiveDuration);
+    final checkInStr = _formatTime(checkInAt);
+    final checkOutStr = _formatTime(checkOutAt);
+
+    return AlertDialog(
+      key: const ValueKey('attendance_completed_dialog'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+      ),
+      contentPadding: EdgeInsets.zero,
+      content: Container(
+        width: 360,
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.85,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.white,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Gradient Hero Banner (Evening / Completed Purple Theme)
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF6366F1),
+                      Color(0xFF4F46E5),
+                      Color(0xFF3730A3),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(22),
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    // Top-right close button (clean dismiss, no bottom action buttons)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: InkWell(
+                        key: const ValueKey('completed_dialog_close_button'),
+                        onTap: () => Navigator.of(context).pop(),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                              width: 2,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '🌙',
+                              style: TextStyle(fontSize: 24),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Office Hours Complete 🌙',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF4338CA),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Time to Have Your Own Time! 🌙',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content Body
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
+                child: Column(
+                  children: [
+                    Text(
+                      'Hey $firstName! Office hours are officially over for today! 🌅 Time to have your own time, relax, and recharge for tomorrow. You did an awesome job today, bro! ✨🛋️',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.45,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Check-in and Check-out Times Display
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          // Check In Block
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.login_rounded,
+                                    size: 16,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Check In',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 1),
+                                      Text(
+                                        checkInStr,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 32,
+                            color: const Color(0xFFCBD5E1),
+                          ),
+                          const SizedBox(width: 10),
+                          // Check Out Block
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366F1)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.logout_rounded,
+                                    size: 16,
+                                    color: Color(0xFF4F46E5),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Check Out',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 1),
+                                      Text(
+                                        checkOutStr,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Hours Worked Highlight Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFEEF2FF),
+                            Color(0xFFE0E7FF),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFC7D2FE)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.timer_outlined,
+                              size: 20,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Worked Today',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF6366F1),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  durationFormatted,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1E1B4B),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'You have worked $durationFormatted on here today! 🎉',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF4338CA),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

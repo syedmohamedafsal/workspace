@@ -86,6 +86,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 record: state.todayRecord,
                 officeName: officeName,
                 companyTimezone: companyTimezone,
+                employeeName: employee?.employeeName ?? defaults.employeeName,
                 locationService: locationService,
                 onConfigureLocation: () => LocationSimulatorSheet.show(
                   context,
@@ -251,6 +252,7 @@ class _AttendanceHeroCard extends StatelessWidget {
     required this.record,
     required this.officeName,
     required this.companyTimezone,
+    this.employeeName,
     required this.locationService,
     required this.onConfigureLocation,
     required this.isSubmitting,
@@ -261,6 +263,7 @@ class _AttendanceHeroCard extends StatelessWidget {
   final AttendanceRecord? record;
   final String officeName;
   final String companyTimezone;
+  final String? employeeName;
   final LocationService locationService;
   final VoidCallback onConfigureLocation;
   final bool isSubmitting;
@@ -274,6 +277,18 @@ class _AttendanceHeroCard extends StatelessWidget {
     final timeFormat = DateFormat('hh:mm a');
     final isCheckedIn = record?.isCheckedIn ?? false;
     final isCompleted = record?.isCompleted ?? false;
+
+    void showCompletedDialog() {
+      AttendanceDialogs.showAttendanceCompletedDialog(
+        context: context,
+        employeeName: employeeName ?? 'REBS',
+        companyTimezone: companyTimezone,
+        checkInAt: record?.checkInAt,
+        checkOutAt: record?.checkOutAt,
+        workedDuration: record?.workedDuration,
+        officeName: officeName,
+      );
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -329,30 +344,38 @@ class _AttendanceHeroCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _TimeBlock(
-                  label: 'Check In',
-                  value: record?.checkInAt != null
-                      ? timeFormat.format(
-                          CompanyClock.toCompanyTimezone(
-                            record!.checkInAt!,
-                            companyTimezone,
-                          ),
-                        )
-                      : '--:--',
+                child: InkWell(
+                  onTap: isCompleted ? showCompletedDialog : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _TimeBlock(
+                    label: 'Check In',
+                    value: record?.checkInAt != null
+                        ? timeFormat.format(
+                            CompanyClock.toCompanyTimezone(
+                              record!.checkInAt!,
+                              companyTimezone,
+                            ),
+                          )
+                        : '--:--',
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _TimeBlock(
-                  label: 'Check Out',
-                  value: record?.checkOutAt != null
-                      ? timeFormat.format(
-                          CompanyClock.toCompanyTimezone(
-                            record!.checkOutAt!,
-                            companyTimezone,
-                          ),
-                        )
-                      : '--:--',
+                child: InkWell(
+                  onTap: isCompleted ? showCompletedDialog : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _TimeBlock(
+                    label: 'Check Out',
+                    value: record?.checkOutAt != null
+                        ? timeFormat.format(
+                            CompanyClock.toCompanyTimezone(
+                              record!.checkOutAt!,
+                              companyTimezone,
+                            ),
+                          )
+                        : '--:--',
+                  ),
                 ),
               ),
             ],
@@ -362,15 +385,17 @@ class _AttendanceHeroCard extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: FilledButton.icon(
-              onPressed: isSubmitting || isCompleted
+              onPressed: isSubmitting
                   ? null
-                  : (isCheckedIn ? onCheckOut : onCheckIn),
+                  : isCompleted
+                      ? showCompletedDialog
+                      : (isCheckedIn ? onCheckOut : onCheckIn),
               style: FilledButton.styleFrom(
                 backgroundColor: isCompleted
                     ? Colors.white.withValues(alpha: 0.14)
                     : (isCheckedIn ? const Color(0xFFEF4444) : Colors.white),
                 foregroundColor: isCompleted
-                    ? Colors.white.withValues(alpha: 0.6)
+                    ? Colors.white.withValues(alpha: 0.85)
                     : (isCheckedIn ? Colors.white : AppTheme.inkDark),
                 disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
                 disabledForegroundColor: Colors.white.withValues(alpha: 0.55),

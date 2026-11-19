@@ -150,4 +150,61 @@ void main() {
       expect(find.byKey(const ValueKey('checkin_welcome_dialog')), findsNothing);
     });
   });
+
+  group('Attendance Completed Dialog Tests', () {
+    testWidgets('displays check-in time, check-out time, hours worked, and hides action buttons', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () {
+                    AttendanceDialogs.showAttendanceCompletedDialog(
+                      context: context,
+                      employeeName: 'Syed Mohamed Afsal',
+                      companyTimezone: 'Asia/Kolkata',
+                      checkInAt: DateTime.utc(2026, 11, 19, 2, 16), // 07:46 AM IST
+                      checkOutAt: DateTime.utc(2026, 11, 19, 10, 41), // 04:11 PM IST
+                      workedDuration: const Duration(hours: 8, minutes: 25),
+                      officeName: 'Teqbae Innovations',
+                    );
+                  },
+                  child: const Text('Open Completed'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Completed'));
+      await tester.pumpAndSettle();
+
+      // Verify dialog is visible
+      expect(find.byKey(const ValueKey('attendance_completed_dialog')), findsOneWidget);
+
+      // Verify check in and check out labels and values
+      expect(find.text('Check In'), findsOneWidget);
+      expect(find.text('Check Out'), findsOneWidget);
+
+      // Verify worked duration and hours message
+      expect(find.text('Worked Today'), findsOneWidget);
+      expect(find.text('08h 25m'), findsOneWidget);
+      expect(find.textContaining('You have worked 08h 25m on here today!'), findsOneWidget);
+
+      // Verify action buttons are completely hidden
+      expect(find.text('Stay a Bit'), findsNothing);
+      expect(find.text('Check Out & Relax 🛋️'), findsNothing);
+      expect(find.text('Let\'s Code! 🚀'), findsNothing);
+      expect(find.text('Office Time View'), findsNothing);
+      expect(find.text('After Hours View'), findsNothing);
+
+      // Verify close button dismisses dialog
+      await tester.tap(find.byKey(const ValueKey('completed_dialog_close_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('attendance_completed_dialog')), findsNothing);
+    });
+  });
 }

@@ -705,21 +705,40 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusBg,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: statusFg,
+                          InkWell(
+                            onTap: isCheckedOut
+                                ? () {
+                                    AttendanceDialogs
+                                        .showAttendanceCompletedDialog(
+                                      context: context,
+                                      employeeName:
+                                          employee?.employeeName ?? 'REBS',
+                                      companyTimezone: companyTimezone,
+                                      checkInAt: todayRecord?.checkInAt,
+                                      checkOutAt: todayRecord?.checkOutAt,
+                                      workedDuration:
+                                          todayRecord?.workedDuration,
+                                      officeName: officeName,
+                                    );
+                                  }
+                                : null,
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusFg,
+                                ),
                               ),
                             ),
                           ),
@@ -808,6 +827,7 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                             officeLatitude: officeLatitude,
                             officeLongitude: officeLongitude,
                             allowedRadiusMeters: allowedRadiusMeters,
+                            companyTimezone: companyTimezone,
                             locationService: locationService,
                           ),
                           const SizedBox(height: 12),
@@ -946,6 +966,7 @@ class _SwipeableAttendancePanel extends StatefulWidget {
     required this.officeLatitude,
     required this.officeLongitude,
     required this.allowedRadiusMeters,
+    required this.companyTimezone,
     required this.locationService,
   });
 
@@ -967,6 +988,7 @@ class _SwipeableAttendancePanel extends StatefulWidget {
   final double officeLatitude;
   final double officeLongitude;
   final double allowedRadiusMeters;
+  final String companyTimezone;
   final LocationService locationService;
 
   @override
@@ -1133,6 +1155,17 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                             onTap: () {
                               if (!widget.isCheckedIn && !widget.isCheckedOut) {
                                 widget.onCheckIn();
+                              } else if (widget.isCheckedOut) {
+                                AttendanceDialogs.showAttendanceCompletedDialog(
+                                  context: context,
+                                  employeeName: widget.employeeName,
+                                  companyTimezone: widget.companyTimezone,
+                                  checkInAt: widget.todayRecord?.checkInAt,
+                                  checkOutAt: widget.todayRecord?.checkOutAt,
+                                  workedDuration:
+                                      widget.todayRecord?.workedDuration,
+                                  officeName: widget.officeName,
+                                );
                               } else {
                                 AttendanceDialogs.showCheckInWelcomeDialog(
                                   context: context,
@@ -1171,14 +1204,27 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                             onTap: () {
                               if (widget.isCheckedIn && !widget.isCheckedOut) {
                                 widget.onCheckOut();
+                              } else if (widget.isCheckedOut) {
+                                AttendanceDialogs.showAttendanceCompletedDialog(
+                                  context: context,
+                                  employeeName: widget.employeeName,
+                                  companyTimezone: widget.companyTimezone,
+                                  checkInAt: widget.todayRecord?.checkInAt,
+                                  checkOutAt: widget.todayRecord?.checkOutAt,
+                                  workedDuration:
+                                      widget.todayRecord?.workedDuration,
+                                  officeName: widget.officeName,
+                                );
                               } else {
                                 AttendanceDialogs.showCheckOutConfirmation(
                                   context: context,
                                   employeeName: widget.employeeName,
-                                  companyTimezone: 'Asia/Kolkata',
+                                  companyTimezone: widget.companyTimezone,
                                   checkInAt: widget.todayRecord?.checkInAt,
+                                  checkOutAt: widget.todayRecord?.checkOutAt,
                                   workedDuration:
                                       widget.todayRecord?.workedDuration,
+                                  officeName: widget.officeName,
                                 );
                               }
                             },
