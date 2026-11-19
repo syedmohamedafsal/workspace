@@ -23,6 +23,14 @@ abstract final class AttendanceFeedbackHandler {
     messenger.hideCurrentSnackBar();
 
     if (errorMessage != null) {
+      final isCheckInRequired = errorMessage.contains('prior check-in') ||
+          errorMessage.contains('after checking in') ||
+          errorMessage.contains('check in before you check out') ||
+          errorMessage.contains('checking in');
+      final displayMessage = isCheckInRequired
+          ? 'You have to check in before you check out.'
+          : errorMessage;
+
       SnackBarAction? action;
       if (failure is LocationPermissionPermanentlyDeniedFailure) {
         action = SnackBarAction(
@@ -58,7 +66,7 @@ abstract final class AttendanceFeedbackHandler {
             borderRadius: BorderRadius.circular(10),
           ),
           backgroundColor: const Color(0xFFB91C1C),
-          content: Text(errorMessage),
+          content: Text(displayMessage),
           action: action,
         ),
       );

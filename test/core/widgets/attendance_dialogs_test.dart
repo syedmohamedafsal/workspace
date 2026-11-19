@@ -207,4 +207,84 @@ void main() {
       expect(find.byKey(const ValueKey('attendance_completed_dialog')), findsNothing);
     });
   });
+
+  group('Check In Required Dialog & SnackBar Tests', () {
+    testWidgets('shows check in required dialog and triggers onCheckIn when confirmed', (tester) async {
+      bool checkInCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () {
+                    AttendanceDialogs.showCheckInRequiredDialog(
+                      context: context,
+                      employeeName: 'Syed Mohamed Afsal',
+                      onCheckIn: () => checkInCalled = true,
+                    );
+                  },
+                  child: const Text('Open Required'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Required'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('checkin_required_dialog')), findsOneWidget);
+      expect(find.text('Check In Required! ⏳'), findsOneWidget);
+      expect(
+        find.text('Hey Syed! You have to check in before you check out.'),
+        findsOneWidget,
+      );
+      expect(find.text('Check In Now 🚀'), findsOneWidget);
+      expect(find.text('Dismiss'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('checkin_required_confirm_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('checkin_required_dialog')), findsNothing);
+      expect(checkInCalled, isTrue);
+    });
+
+    testWidgets('shows floating check in required snackbar with check in action', (tester) async {
+      bool checkInCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () {
+                    AttendanceDialogs.showCheckInRequiredSnackBar(
+                      context,
+                      onCheckIn: () => checkInCalled = true,
+                    );
+                  },
+                  child: const Text('Show SnackBar'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show SnackBar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('You have to check in before you check out.'), findsOneWidget);
+      expect(find.text('Check In'), findsOneWidget);
+
+      await tester.tap(find.text('Check In'));
+      await tester.pumpAndSettle();
+
+      expect(checkInCalled, isTrue);
+    });
+  });
 }

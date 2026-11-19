@@ -280,7 +280,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       );
       if (existing == null || existing.checkInAt == null) {
         return const FailureResult(
-          ValidationFailure('Check-out is permitted only after checking in.'),
+          ValidationFailure('You have to check in before you check out.'),
         );
       }
       if (existing.checkOutAt != null) {

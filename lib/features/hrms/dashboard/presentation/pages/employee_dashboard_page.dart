@@ -1216,15 +1216,14 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                                   officeName: widget.officeName,
                                 );
                               } else {
-                                AttendanceDialogs.showCheckOutConfirmation(
+                                AttendanceDialogs.showCheckInRequiredDialog(
                                   context: context,
                                   employeeName: widget.employeeName,
-                                  companyTimezone: widget.companyTimezone,
-                                  checkInAt: widget.todayRecord?.checkInAt,
-                                  checkOutAt: widget.todayRecord?.checkOutAt,
-                                  workedDuration:
-                                      widget.todayRecord?.workedDuration,
-                                  officeName: widget.officeName,
+                                  onCheckIn: widget.onCheckIn,
+                                );
+                                AttendanceDialogs.showCheckInRequiredSnackBar(
+                                  context,
+                                  onCheckIn: widget.onCheckIn,
                                 );
                               }
                             },

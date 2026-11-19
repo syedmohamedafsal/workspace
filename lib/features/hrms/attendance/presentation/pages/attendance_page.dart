@@ -363,7 +363,23 @@ class _AttendanceHeroCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
-                  onTap: isCompleted ? showCompletedDialog : null,
+                  onTap: () {
+                    if (isCompleted) {
+                      showCompletedDialog();
+                    } else if (!isCheckedIn) {
+                      AttendanceDialogs.showCheckInRequiredDialog(
+                        context: context,
+                        employeeName: employeeName ?? 'REBS',
+                        onCheckIn: onCheckIn,
+                      );
+                      AttendanceDialogs.showCheckInRequiredSnackBar(
+                        context,
+                        onCheckIn: onCheckIn,
+                      );
+                    } else {
+                      onCheckOut();
+                    }
+                  },
                   borderRadius: BorderRadius.circular(12),
                   child: _TimeBlock(
                     label: 'Check Out',

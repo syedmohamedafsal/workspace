@@ -511,7 +511,7 @@ class MockHttpServer {
         await _sendJson(
           request,
           {
-            'error': 'Check-out is permitted only after check-in.',
+            'error': 'You have to check in before you check out.',
             'code': 'CHECK_OUT_WITHOUT_CHECK_IN',
           },
           statusCode: HttpStatus.unprocessableEntity,
