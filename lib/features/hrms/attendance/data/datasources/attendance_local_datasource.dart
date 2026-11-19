@@ -43,6 +43,13 @@ abstract interface class AttendanceLocalDataSource {
     required RecordSyncStatus status,
     String? error,
   });
+
+  /// Deletes today's local attendance record for the employee to allow
+  /// restarting the check-in and check-out test cycle.
+  Future<void> clearTodayAttendance({
+    required String employeeId,
+    required DateTime date,
+  });
 }
 
 class AttendanceLocalDataSourceImpl implements AttendanceLocalDataSource {
@@ -213,6 +220,24 @@ class AttendanceLocalDataSourceImpl implements AttendanceLocalDataSource {
       );
     } catch (e) {
       throw CacheException('Failed to update attendance sync status.', cause: e);
+    }
+  }
+
+  @override
+  Future<void> clearTodayAttendance({
+    required String employeeId,
+    required DateTime date,
+  }) async {
+    try {
+      final db = await _appDatabase.database;
+      final dateKey = AttendanceRecordModel.formatDateKey(date);
+      await db.delete(
+        DbConstants.tableAttendance,
+        where: 'employee_id = ? AND attendance_date = ?',
+        whereArgs: [employeeId, dateKey],
+      );
+    } catch (e) {
+      throw CacheException('Failed to clear today attendance.', cause: e);
     }
   }
 }

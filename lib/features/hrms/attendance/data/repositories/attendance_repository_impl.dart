@@ -227,13 +227,17 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         updatedAt: now,
       );
 
+      final idempotencyKey = _uuid.v4();
       final operation = SyncOperation(
         id: _uuid.v4(),
         entityType: AttendanceSyncHandler.kEntityType,
         entityId: record.localId,
         operationType: AttendanceSyncHandler.kOpCheckIn,
-        payload: record.toCheckInPayload(companyTimezone: ctx.companyTimezone),
-        idempotencyKey: _uuid.v4(),
+        payload: record.toCheckInPayload(
+          companyTimezone: ctx.companyTimezone,
+          eventId: idempotencyKey,
+        ),
+        idempotencyKey: idempotencyKey,
         status: SyncQueueStatus.pending,
         retryCount: 0,
         createdAt: now,
@@ -327,14 +331,17 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         ),
       );
 
+      final idempotencyKey = _uuid.v4();
       final operation = SyncOperation(
         id: _uuid.v4(),
         entityType: AttendanceSyncHandler.kEntityType,
         entityId: updated.localId,
         operationType: AttendanceSyncHandler.kOpCheckOut,
-        payload:
-            updated.toCheckOutPayload(companyTimezone: ctx.companyTimezone),
-        idempotencyKey: _uuid.v4(),
+        payload: updated.toCheckOutPayload(
+          companyTimezone: ctx.companyTimezone,
+          eventId: idempotencyKey,
+        ),
+        idempotencyKey: idempotencyKey,
         status: SyncQueueStatus.pending,
         retryCount: 0,
         createdAt: now,
@@ -354,6 +361,21 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return FailureResult(UnexpectedFailure(e.toString()));
     } finally {
       _isMutationInFlight = false;
+    }
+  }
+
+  @override
+  Future<Result<void>> resetTodayAttendance() async {
+    try {
+      final ctx = await _resolveEmployeeContext();
+      final workingDate = _companyClock.workingDate(ctx.companyTimezone);
+      await _localDataSource.clearTodayAttendance(
+        employeeId: ctx.employeeId,
+        date: workingDate,
+      );
+      return const Success(null);
+    } catch (e) {
+      return FailureResult(CacheFailure('Failed to reset attendance: $e'));
     }
   }
 }

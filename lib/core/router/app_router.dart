@@ -74,15 +74,11 @@ GoRouter createAppRouter() {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: AppRoutes.modules,
-                builder: (context, state) => const RebsModulesPage(),
-              ),
-            ],
-          ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.modules,
+        builder: (context, state) => const RebsModulesPage(),
       ),
       GoRoute(
         path: AppRoutes.crm,

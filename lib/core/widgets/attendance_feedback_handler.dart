@@ -66,14 +66,43 @@ abstract final class AttendanceFeedbackHandler {
     }
 
     if (feedbackMessage != null) {
+      final isCheckInWelcome = feedbackMessage.contains('coffee') ||
+          feedbackMessage.contains('commit');
+      final isCheckOut = feedbackMessage.contains('Checked out') ||
+          feedbackMessage.contains('Office hours') ||
+          feedbackMessage.contains('office time');
+
+      final (bgColor, iconEmoji) = isCheckInWelcome
+          ? (const Color(0xFF065F46), '☕')
+          : isCheckOut
+              ? (const Color(0xFF1E1B4B), '🌙')
+              : (AppTheme.inkDark, '✨');
+
       messenger.showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
           ),
-          backgroundColor: AppTheme.inkDark,
-          content: Text(feedbackMessage),
+          backgroundColor: bgColor,
+          content: Row(
+            children: [
+              Text(iconEmoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  feedbackMessage,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

@@ -20,20 +20,37 @@ final class CheckInSubmitted extends AttendanceEvent {
   const CheckInSubmitted({
     this.workLocation,
     this.note,
+    this.employeeName,
   });
 
   final String? workLocation;
   final String? note;
+  final String? employeeName;
 
   @override
-  List<Object?> get props => [workLocation, note];
+  List<Object?> get props => [workLocation, note, employeeName];
 }
 
 final class CheckOutSubmitted extends AttendanceEvent {
-  const CheckOutSubmitted({this.note});
+  const CheckOutSubmitted({
+    this.note,
+    this.employeeName,
+    this.isOfficeHoursOver,
+  });
 
   final String? note;
+  final String? employeeName;
+  final bool? isOfficeHoursOver;
 
   @override
-  List<Object?> get props => [note];
+  List<Object?> get props => [note, employeeName, isOfficeHoursOver];
+}
+
+final class ResetTodayAttendanceRequested extends AttendanceEvent {
+  const ResetTodayAttendanceRequested({this.employeeName});
+
+  final String? employeeName;
+
+  @override
+  List<Object?> get props => [employeeName];
 }

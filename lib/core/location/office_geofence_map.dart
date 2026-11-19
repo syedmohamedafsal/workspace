@@ -10,8 +10,7 @@ import 'geo_distance_calculator.dart';
 import 'location_models.dart';
 import 'location_service.dart';
 
-/// 1x1 transparent PNG used as a silent fallback tile when completely offline
-/// so the clean map canvas below stays visible without red error boxes.
+/// 1x1 transparent PNG fallback tile when offline
 final Uint8List _kTransparentTileBytes = Uint8List.fromList(const <int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
   0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -24,13 +23,44 @@ final Uint8List _kTransparentTileBytes = Uint8List.fromList(const <int>[
   0x42, 0x60, 0x82,
 ]);
 
-/// Real interactive street map view centered on the configured office location,
-/// displaying:
-/// - Real CartoDB Voyager retina street map tiles (zero API key required)
-/// - Pinned office location marker (e.g. Teqbae Innovations, Kochi)
-/// - True metric 200m geofence circle surrounding the office
-/// - User's live GPS or simulated location pin with connecting distance vector
-/// - Zoom (+/-), re-center, tap-to-pin, and one-tap Full-Screen Map expansion
+/// Completely free, zero-plugin TileProvider that loads real map tiles
+/// via Flutter's built-in [NetworkImage], bypassing native path_provider channels.
+class DirectNetworkTileProvider extends TileProvider {
+  DirectNetworkTileProvider({super.headers});
+
+  @override
+  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
+    final url = getTileUrl(coordinates, options);
+    return NetworkImage(
+      url,
+      headers: {
+        'User-Agent': 'rebs_hrms_app/1.0 (Flutter; Mobile Office)',
+        ...headers,
+      },
+    );
+  }
+}
+
+/// Available free real map tile layers (OpenStreetMap, Carto Voyager, and Satellite).
+enum MapLayerType {
+  osm('Street (OSM)', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+  carto('Modern', 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'),
+  satellite(
+    'Satellite',
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  );
+
+  const MapLayerType(this.label, this.urlTemplate);
+  final String label;
+  final String urlTemplate;
+}
+
+/// Real interactive street map view with:
+/// - 3D Isometric Office Building marker at Teqbae Kochi HQ
+/// - 3D Standing Person Character avatar representing the user
+/// - True metric 200m radius geofence ring
+/// - Free real map tile layers (Street OSM / Satellite / Modern)
+/// - Zoom, re-center, tap-to-pin, and full-screen map expansion
 class OfficeGeofenceMap extends StatefulWidget {
   const OfficeGeofenceMap({
     super.key,
@@ -59,7 +89,7 @@ class OfficeGeofenceMap extends StatefulWidget {
 
 class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
   final MapController _mapController = MapController();
-  late final NetworkTileProvider _tileProvider;
+  final DirectNetworkTileProvider _tileProvider = DirectNetworkTileProvider();
   StreamSubscription<LocationSimulationState>? _simSub;
 
   late LocationSimulationState _simulation;
@@ -67,11 +97,12 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
   bool _isResolvingLiveGps = false;
   String? _liveGpsNote;
   bool _mapReady = false;
+  MapLayerType _selectedLayer = MapLayerType.osm;
 
   LatLng get _officePoint =>
       LatLng(widget.officeLatitude, widget.officeLongitude);
 
-  double get _defaultZoom => widget.isFullScreen ? 16.4 : 15.6;
+  double get _defaultZoom => widget.isFullScreen ? 16.5 : 15.8;
 
   bool get _isRunningInWidgetTest {
     final bindingName = WidgetsBinding.instance.runtimeType.toString();
@@ -84,10 +115,6 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
   @override
   void initState() {
     super.initState();
-    _tileProvider = NetworkTileProvider(
-      silenceExceptions: true,
-      cachingProvider: const DisabledMapCachingProvider(),
-    );
     _simulation = widget.locationService.simulationState;
     _simSub = widget.locationService.simulationStream.listen((next) {
       if (!mounted) return;
@@ -119,7 +146,6 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
   @override
   void dispose() {
     _simSub?.cancel();
-    _tileProvider.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -251,7 +277,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
         ],
         padding: widget.isFullScreen
             ? const EdgeInsets.fromLTRB(48, 88, 48, 88)
-            : const EdgeInsets.fromLTRB(34, 42, 34, 34),
+            : const EdgeInsets.fromLTRB(36, 48, 36, 36),
         maxZoom: _defaultZoom,
       ),
     );
@@ -262,6 +288,16 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
     final current = _mapController.camera;
     final targetZoom = (current.zoom + delta).clamp(11.0, 19.0);
     _mapController.move(current.center, targetZoom);
+  }
+
+  void _cycleLayer() {
+    setState(() {
+      _selectedLayer = switch (_selectedLayer) {
+        MapLayerType.osm => MapLayerType.satellite,
+        MapLayerType.satellite => MapLayerType.carto,
+        MapLayerType.carto => MapLayerType.osm,
+      };
+    });
   }
 
   String _formatDistance(double meters) {
@@ -357,9 +393,9 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Clean cartographic canvas while real street tiles load or when offline
+          // Underlying cartographic grid background
           const ColoredBox(
-            color: Color(0xFFE9EFF5),
+            color: Color(0xFFE2E8F0),
             child: CustomPaint(
               painter: _LightMapGridPainter(),
             ),
@@ -373,8 +409,6 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
               maxZoom: 19.0,
               backgroundColor: Colors.transparent,
               interactionOptions: InteractionOptions(
-                // Full drag + pinch in full-screen; pinch/double-tap in embedded
-                // card so horizontal swipe between Clock and Map stays smooth.
                 flags: widget.isFullScreen
                     ? InteractiveFlag.all & ~InteractiveFlag.rotate
                     : InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
@@ -388,16 +422,14 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
             children: [
               if (_shouldLoadNetworkTiles)
                 TileLayer(
-                  urlTemplate:
-                      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                  subdomains: const ['a', 'b', 'c', 'd'],
-                  retinaMode: RetinaMode.isHighDensity(context),
-                  userAgentPackageName: 'com.rebs.app',
+                  key: ValueKey('map_layer_${_selectedLayer.name}'),
+                  urlTemplate: _selectedLayer.urlTemplate,
+                  userAgentPackageName: 'com.rebs.rebs',
                   tileProvider: _tileProvider,
                   errorImage: MemoryImage(_kTransparentTileBytes),
                   errorTileCallback: (_, _, _) {},
                 ),
-              // True metric 200m geofence circle + subtle 100m inner ring
+              // True metric 200m geofence circle + subtle 100m inner guide
               CircleLayer(
                 circles: [
                   CircleMarker(
@@ -418,7 +450,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
                   ),
                 ],
               ),
-              // Distance connector line between office pin and nearby user pin
+              // Distance connector line between office and user
               if (showConnectorLine)
                 PolylineLayer(
                   polylines: [
@@ -429,53 +461,56 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
                     ),
                   ],
                 ),
-              // Pinned office marker, 200m perimeter tag, and user location pin
+              // 3D Office Building, 3D Standing Person, and 200m perimeter badge
               MarkerLayer(
                 markers: [
+                  // 200m perimeter tag on eastern radius
                   Marker(
                     point: radiusTagPoint,
                     width: 46,
                     height: 20,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1E3D).withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: zoneColor.withValues(alpha: 0.85),
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F1E3D).withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: zoneColor.withValues(alpha: 0.85),
-                          ),
-                        ),
-                        child: Text(
-                          '${widget.allowedRadiusMeters.round()}m',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${widget.allowedRadiusMeters.round()}m',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ),
+                  // 3D Isometric Office Building (anchored bottom-center at office coordinates)
                   Marker(
                     point: _officePoint,
-                    width: 142,
-                    height: 54,
-                    alignment: Alignment.topCenter,
-                    child: _OfficePinMarker(
+                    width: 140,
+                    height: 112,
+                    alignment: Alignment.bottomCenter,
+                    child: _Isometric3DBuildingMarker(
                       label: _shortOfficeLabel(widget.officeName),
                     ),
                   ),
+                  // 3D Standing Person Character avatar (anchored bottom-center at user coordinates)
                   if (userPoint != null)
                     Marker(
                       point: userPoint,
-                      width: 64,
-                      height: 46,
-                      alignment: Alignment.center,
-                      child: _UserLocationMarker(
+                      width: 90,
+                      height: 88,
+                      alignment: Alignment.bottomCenter,
+                      child: _Isometric3DPersonMarker(
                         isInside: isInside ?? true,
                       ),
                     ),
@@ -483,11 +518,11 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
               ),
             ],
           ),
-          // Top-left live distance & geofence status pill
+          // Top-left live status pill
           Positioned(
             top: 8,
             left: 8,
-            right: widget.isFullScreen ? 56 : 84,
+            right: widget.isFullScreen ? 56 : 118,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -496,7 +531,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D1B36).withValues(alpha: 0.9),
+                  color: const Color(0xFF0D1B36).withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: statusDot.withValues(alpha: 0.5),
@@ -538,13 +573,20 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
               ),
             ),
           ),
-          // Top-right action buttons: Re-center + Expand to Full-Screen Real Map
+          // Top-right action buttons: Layer Switcher + Re-center + Full-screen
           Positioned(
             top: 8,
             right: 8,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _MapIconButton(
+                  key: const ValueKey('map_layer_toggle_button'),
+                  icon: Icons.layers_rounded,
+                  tooltip: 'Layer: ${_selectedLayer.label}',
+                  onTap: _cycleLayer,
+                ),
+                const SizedBox(width: 6),
                 _MapIconButton(
                   key: const ValueKey('map_recenter_button'),
                   icon: Icons.my_location_rounded,
@@ -568,7 +610,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
               ],
             ),
           ),
-          // Bottom-left interactive tap-to-pin caption
+          // Bottom-left interactive hint
           Positioned(
             bottom: 8,
             left: 8,
@@ -578,7 +620,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
                 vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D1B36).withValues(alpha: 0.84),
+                color: const Color(0xFF0D1B36).withValues(alpha: 0.86),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -587,13 +629,13 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
                   Icon(
                     Icons.touch_app_rounded,
                     size: 11,
-                    color: Colors.white.withValues(alpha: 0.88),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     widget.isFullScreen
-                        ? 'Drag to pan • Tap map to move pin'
-                        : 'Tap map to pin • Expand to pan',
+                        ? 'Drag to pan • Tap to place 3D person'
+                        : 'Tap map to place 3D person',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -604,7 +646,7 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
               ),
             ),
           ),
-          // Bottom-right real map Zoom +/- controls
+          // Bottom-right Zoom +/- controls
           Positioned(
             bottom: 8,
             right: 8,
@@ -679,10 +721,10 @@ class _OfficeGeofenceMapState extends State<OfficeGeofenceMap> {
       key: const ValueKey('office_geofence_map'),
       height: widget.height,
       decoration: BoxDecoration(
-        color: const Color(0xFFE9EFF5),
+        color: const Color(0xFFE2E8F0),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: Colors.white.withValues(alpha: 0.25),
         ),
       ),
       child: mapContent,
@@ -893,8 +935,11 @@ class _MapIconButton extends StatelessWidget {
   }
 }
 
-class _OfficePinMarker extends StatelessWidget {
-  const _OfficePinMarker({required this.label});
+/// 3D Isometric Office Building marker placed at the office location.
+/// Displays a multi-story corporate glass-and-steel tower with illuminated
+/// windows, helipad, and Teqbae mark.
+class _Isometric3DBuildingMarker extends StatelessWidget {
+  const _Isometric3DBuildingMarker({required this.label});
 
   final String label;
 
@@ -903,20 +948,21 @@ class _OfficePinMarker extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Floating glassmorphic office label pill
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A0B0D),
+            color: const Color(0xFF0A0B0D).withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(9),
             border: Border.all(
               color: const Color(0xFF10B981),
-              width: 1.5,
+              width: 1.4,
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -925,11 +971,11 @@ class _OfficePinMarker extends StatelessWidget {
             children: [
               Image.asset(
                 'assets/images/teqbae_mark.png',
-                width: 14,
-                height: 14,
+                width: 13,
+                height: 13,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               Flexible(
                 child: Text(
                   label,
@@ -945,112 +991,434 @@ class _OfficePinMarker extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 2),
+        // 3D Isometric Tower Model
         const CustomPaint(
-          size: Size(10, 6),
-          painter: _PinPointerPainter(color: Color(0xFF10B981)),
-        ),
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 4,
-              ),
-            ],
-          ),
+          size: Size(68, 76),
+          painter: _IsometricBuildingPainter(),
         ),
       ],
     );
   }
 }
 
-class _UserLocationMarker extends StatelessWidget {
-  const _UserLocationMarker({required this.isInside});
+/// CustomPainter rendering a 3D isometric modern office tower with lit windows,
+/// roof terrace, and ground anchor shadow.
+class _IsometricBuildingPainter extends CustomPainter {
+  const _IsometricBuildingPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const w = 68.0;
+    const h = 76.0;
+
+    // 1. Soft ground contact shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.32)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(w / 2 + 6, h - 8), width: 52, height: 16),
+      shadowPaint,
+    );
+
+    // 2. Emerald GPS ground anchor glow
+    final anchorGlowPaint = Paint()
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(w / 2, h - 9), width: 38, height: 13),
+      anchorGlowPaint,
+    );
+
+    // Geometry coordinates
+    const pCenterBase = Offset(w / 2, h - 9);
+    const pLeftBase = Offset(12, h - 21);
+    const pRightBase = Offset(w - 12, h - 21);
+    const pCenterTop = Offset(w / 2, 28);
+    const pLeftTop = Offset(12, 16);
+    const pRightTop = Offset(w - 12, 16);
+    const pRoofApex = Offset(w / 2, 5);
+
+    // 3. Left Wall (Ambient / Slate Blue)
+    final leftWallPath = Path()
+      ..moveTo(pLeftTop.dx, pLeftTop.dy)
+      ..lineTo(pCenterTop.dx, pCenterTop.dy)
+      ..lineTo(pCenterBase.dx, pCenterBase.dy)
+      ..lineTo(pLeftBase.dx, pLeftBase.dy)
+      ..close();
+
+    final leftWallPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+      ).createShader(Rect.fromLTRB(12, 16, w / 2, h - 9));
+    canvas.drawPath(leftWallPath, leftWallPaint);
+
+    // 4. Right Wall (Sunlit / Corporate Steel)
+    final rightWallPath = Path()
+      ..moveTo(pCenterTop.dx, pCenterTop.dy)
+      ..lineTo(pRightTop.dx, pRightTop.dy)
+      ..lineTo(pRightBase.dx, pRightBase.dy)
+      ..lineTo(pCenterBase.dx, pCenterBase.dy)
+      ..close();
+
+    final rightWallPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [Color(0xFF334155), Color(0xFF1E293B)],
+      ).createShader(Rect.fromLTRB(w / 2, 16, w - 12, h - 9));
+    canvas.drawPath(rightWallPath, rightWallPaint);
+
+    // 5. Floor dividers & illuminated window grid
+    final windowLitPaint = Paint()..color = const Color(0xFF38BDF8).withValues(alpha: 0.85);
+    final windowDimPaint = Paint()..color = const Color(0xFF67E8F9).withValues(alpha: 0.45);
+    final floorLinePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..strokeWidth = 1.0;
+
+    for (int i = 1; i <= 4; i++) {
+      final t = i / 5.0;
+      final yL = pLeftTop.dy + (pLeftBase.dy - pLeftTop.dy) * t;
+      final yC = pCenterTop.dy + (pCenterBase.dy - pCenterTop.dy) * t;
+      final yR = pRightTop.dy + (pRightBase.dy - pRightTop.dy) * t;
+
+      // Floor divider strokes
+      canvas.drawLine(Offset(pLeftTop.dx, yL), Offset(pCenterTop.dx, yC), floorLinePaint);
+      canvas.drawLine(Offset(pCenterTop.dx, yC), Offset(pRightTop.dx, yR), floorLinePaint);
+
+      // Windows on Left Wall
+      for (int wIdx = 0; wIdx < 3; wIdx++) {
+        final wt = (wIdx + 1) / 4.0;
+        final wx = pLeftTop.dx + (pCenterTop.dx - pLeftTop.dx) * wt;
+        final wy = yL + (yC - yL) * wt - 4;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(wx - 2, wy, 4, 3), const Radius.circular(1)),
+          (i + wIdx) % 2 == 0 ? windowLitPaint : windowDimPaint,
+        );
+      }
+
+      // Windows on Right Wall
+      for (int wIdx = 0; wIdx < 3; wIdx++) {
+        final wt = (wIdx + 1) / 4.0;
+        final wx = pCenterTop.dx + (pRightTop.dx - pCenterTop.dx) * wt;
+        final wy = yC + (yR - yC) * wt - 4;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(wx - 2, wy, 4, 3), const Radius.circular(1)),
+          (i * wIdx) % 2 == 0 ? windowLitPaint : windowDimPaint,
+        );
+      }
+    }
+
+    // 6. Ground Entrance Canopy with warm golden light
+    final entrancePath = Path()
+      ..moveTo(w / 2 - 6, h - 16)
+      ..lineTo(w / 2 + 6, h - 16)
+      ..lineTo(w / 2 + 6, h - 10)
+      ..lineTo(w / 2 - 6, h - 10)
+      ..close();
+    final entrancePaint = Paint()..color = const Color(0xFFFDE68A);
+    canvas.drawPath(entrancePath, entrancePaint);
+
+    // 7. Roof Deck (Isometric Rhombus)
+    final roofPath = Path()
+      ..moveTo(pRoofApex.dx, pRoofApex.dy)
+      ..lineTo(pRightTop.dx, pRightTop.dy)
+      ..lineTo(pCenterTop.dx, pCenterTop.dy)
+      ..lineTo(pLeftTop.dx, pLeftTop.dy)
+      ..close();
+
+    final roofPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF0F1E3D), Color(0xFF1E3A8A)],
+      ).createShader(Rect.fromLTRB(12, 5, w - 12, 28));
+    canvas.drawPath(roofPath, roofPaint);
+
+    // Roof border highlight
+    final roofBorderPaint = Paint()
+      ..color = const Color(0xFF60A5FA).withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawPath(roofPath, roofBorderPaint);
+
+    // 8. Rooftop Helipad ring
+    final helipadPaint = Paint()
+      ..color = const Color(0xFFFCD34D).withValues(alpha: 0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(w / 2, 17), width: 14, height: 7),
+      helipadPaint,
+    );
+
+    // 9. Steel Antenna Mast with pulsing red beacon
+    final mastPaint = Paint()
+      ..color = const Color(0xFFCBD5E1)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(const Offset(w / 2, 5), const Offset(w / 2, -2), mastPaint);
+
+    final beaconPaint = Paint()..color = const Color(0xFFEF4444);
+    canvas.drawCircle(const Offset(w / 2, -2), 2.2, beaconPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 3D Standing Person Character marker placed at the user's location.
+/// Renders a modern isometric standing developer character with 3D volumetric
+/// lighting, shoes, trousers, jacket, lanyard, and anchor shadow.
+class _Isometric3DPersonMarker extends StatelessWidget {
+  const _Isometric3DPersonMarker({required this.isInside});
 
   final bool isInside;
 
   @override
   Widget build(BuildContext context) {
-    final color = isInside ? const Color(0xFF2563EB) : const Color(0xFFD97706);
+    final statusColor =
+        isInside ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Floating Name Tag with dynamic distance beacon
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(6),
+            color: const Color(0xFF0D1B36).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: statusColor.withValues(alpha: 0.7),
+              width: 1.2,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 4,
+                color: Colors.black.withValues(alpha: 0.28),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: const Text(
-            'You',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'You',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 2),
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.25),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ),
+        const SizedBox(height: 1),
+        // 3D Person Character CustomPaint
+        CustomPaint(
+          size: const Size(42, 60),
+          painter: _Person3DPainter(isInside: isInside),
         ),
       ],
     );
   }
 }
 
-class _PinPointerPainter extends CustomPainter {
-  const _PinPointerPainter({required this.color});
+/// CustomPainter that renders a stylized 3D isometric character model standing:
+/// - 3D head with volume, skin tone highlights, and dark styled hair
+/// - Fitted azure developer hoodie/blazer with lanyard
+/// - Tailored dark slacks with lighting crease
+/// - 3D sneakers planted on an interactive anchor aura
+class _Person3DPainter extends CustomPainter {
+  const _Person3DPainter({required this.isInside});
 
-  final Color color;
+  final bool isInside;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width / 2, size.height)
+    const cx = 21.0;
+
+    // 1. Ground contact shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(cx, 56), width: 26, height: 9),
+      shadowPaint,
+    );
+
+    // 2. Active Geofence ground anchor ring
+    final ringColor =
+        isInside ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final anchorRingPaint = Paint()
+      ..color = ringColor.withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(cx, 56), width: 32, height: 11),
+      anchorRingPaint,
+    );
+
+    // 3. 3D Shoes (white sole + dark navy leather top)
+    final solePaint = Paint()..color = const Color(0xFFF1F5F9);
+    final shoeTopPaint = Paint()..color = const Color(0xFF0F172A);
+
+    // Left shoe
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(13, 53, 6.5, 3), const Radius.circular(1.5)),
+      shoeTopPaint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(13, 55, 6.5, 1.5), const Radius.circular(0.8)),
+      solePaint,
+    );
+
+    // Right shoe
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(22.5, 53, 6.5, 3), const Radius.circular(1.5)),
+      shoeTopPaint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(22.5, 55, 6.5, 1.5), const Radius.circular(0.8)),
+      solePaint,
+    );
+
+    // 4. Tailored Trousers / Legs (3D cylinder lighting)
+    final pantsPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF334155), Color(0xFF0F172A)],
+      ).createShader(const Rect.fromLTWH(12, 38, 18, 16));
+
+    // Left leg
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(13.5, 38, 6.5, 16), const Radius.circular(2)),
+      pantsPaint,
+    );
+    // Right leg
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(22, 38, 6.5, 16), const Radius.circular(2)),
+      pantsPaint,
+    );
+
+    // 5. Torso / 3D Corporate Developer Jacket
+    final jacketPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+      ).createShader(const Rect.fromLTWH(12, 20, 18, 19));
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(12.5, 20, 17, 19), const Radius.circular(4)),
+      jacketPaint,
+    );
+
+    // Inner shirt collar
+    final collarPaint = Paint()..color = Colors.white;
+    final collarPath = Path()
+      ..moveTo(18, 20)
+      ..lineTo(cx, 24)
+      ..lineTo(24, 20)
       ..close();
-    canvas.drawPath(path, paint);
+    canvas.drawPath(collarPath, collarPaint);
+
+    // Developer Lanyard & Mini Badge
+    final lanyardPaint = Paint()
+      ..color = const Color(0xFF10B981)
+      ..strokeWidth = 1.0;
+    canvas.drawLine(const Offset(19, 20), const Offset(cx, 28), lanyardPaint);
+    canvas.drawLine(const Offset(23, 20), const Offset(cx, 28), lanyardPaint);
+
+    final badgeCardPaint = Paint()..color = const Color(0xFFF1F5F9);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromCenter(center: const Offset(cx, 30.5), width: 4.5, height: 4), const Radius.circular(0.8)),
+      badgeCardPaint,
+    );
+
+    // 6. Arms & Hands (holding a phone on the right hand)
+    final armPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF0284C7), Color(0xFF075985)],
+      ).createShader(const Rect.fromLTWH(9, 21, 24, 16));
+
+    // Left arm
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(9, 21, 4.5, 15), const Radius.circular(2.5)),
+      armPaint,
+    );
+
+    // Right arm (angled)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(28.5, 21, 4.5, 13), const Radius.circular(2.5)),
+      armPaint,
+    );
+
+    // Hands
+    final skinPaint = Paint()..color = const Color(0xFFE0AC8A);
+    canvas.drawCircle(const Offset(11, 37), 2.2, skinPaint); // left hand
+    canvas.drawCircle(const Offset(31, 34), 2.2, skinPaint); // right hand
+
+    // Mini smartphone in right hand
+    final phonePaint = Paint()..color = const Color(0xFF0F172A);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(30, 31, 3.2, 5.5), const Radius.circular(0.8)),
+      phonePaint,
+    );
+    final phoneScreenPaint = Paint()..color = const Color(0xFF38BDF8);
+    canvas.drawRect(const Rect.fromLTWH(30.4, 31.5, 2.4, 4.5), phoneScreenPaint);
+
+    // 7. Neck & 3D Volumetric Head
+    canvas.drawRect(const Rect.fromLTWH(cx - 2, 16, 4, 4.5), skinPaint);
+
+    final headPaint = Paint()
+      ..shader = const RadialGradient(
+        center: Alignment(-0.3, -0.3),
+        radius: 0.8,
+        colors: [Color(0xFFF5D0B5), Color(0xFFC68642)],
+      ).createShader(const Rect.fromLTWH(15.5, 6, 11, 12));
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(15.5, 6, 11, 12), const Radius.circular(5.5)),
+      headPaint,
+    );
+
+    // 8. 3D Dark Styled Hair
+    final hairPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF1E293B), Color(0xFF090D16)],
+      ).createShader(const Rect.fromLTWH(15, 4, 12, 7));
+
+    final hairPath = Path()
+      ..moveTo(15, 11)
+      ..cubicTo(15, 3.5, 27, 3.5, 27, 11)
+      ..lineTo(27, 8)
+      ..cubicTo(25, 4.5, 17, 4.5, 15, 8)
+      ..close();
+    canvas.drawPath(hairPath, hairPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _PinPointerPainter oldDelegate) =>
-      oldDelegate.color != color;
+  bool shouldRepaint(covariant _Person3DPainter oldDelegate) =>
+      oldDelegate.isInside != isInside;
 }
 
 class _LightMapGridPainter extends CustomPainter {

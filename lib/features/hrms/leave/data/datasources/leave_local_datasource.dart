@@ -23,6 +23,11 @@ abstract interface class LeaveLocalDataSource {
     double pendingDaysDelta = 0,
   });
 
+  Future<void> saveRequest({
+    required LeaveRequestModel request,
+    double pendingDaysDelta = 0,
+  });
+
   Future<void> mergeRemoteRequests(List<LeaveRequestModel> remoteRequests);
 
   Future<void> replaceBalances(List<LeaveBalanceModel> balances);
@@ -126,6 +131,41 @@ class LeaveLocalDataSourceImpl implements LeaveLocalDataSource {
         }
 
         await _syncQueueDataSource.enqueue(syncOperation, executor: txn);
+      });
+    } catch (e) {
+      throw CacheException('Failed to save leave request locally.', cause: e);
+    }
+  }
+
+  @override
+  Future<void> saveRequest({
+    required LeaveRequestModel request,
+    double pendingDaysDelta = 0,
+  }) async {
+    try {
+      final db = await _appDatabase.database;
+      await db.transaction((txn) async {
+        await txn.insert(
+          DbConstants.tableLeaveRequests,
+          request.toDbMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        if (pendingDaysDelta != 0) {
+          await txn.rawUpdate(
+            '''
+            UPDATE ${DbConstants.tableLeaveBalances}
+            SET pending_days = MAX(0, pending_days + ?),
+                updated_at = ?
+            WHERE leave_type = ?
+            ''',
+            [
+              pendingDaysDelta,
+              DateTime.now().toIso8601String(),
+              request.leaveType.name,
+            ],
+          );
+        }
       });
     } catch (e) {
       throw CacheException('Failed to save leave request locally.', cause: e);

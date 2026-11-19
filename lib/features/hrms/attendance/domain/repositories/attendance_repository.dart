@@ -18,4 +18,7 @@ abstract interface class AttendanceRepository {
   Future<Result<AttendanceRecord>> checkOut({
     String? note,
   });
+
+  /// Resets today's attendance record locally for reviewer re-testing.
+  Future<Result<void>> resetTodayAttendance();
 }

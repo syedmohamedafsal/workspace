@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../sync/sync_manager.dart';
 import '../sync/sync_status.dart';
 import '../theme/app_theme.dart';
+import 'sync_feedback_handler.dart';
 import 'sync_status_banner.dart';
 
 /// Persistent navigation shell for the REBS employee workspace.
@@ -21,7 +22,6 @@ class AppShellScaffold extends StatelessWidget {
     'Workspace',
     'Attendance',
     'Leave',
-    'Modules',
   ];
 
   @override
@@ -69,7 +69,10 @@ class AppShellScaffold extends StatelessWidget {
                         child: InkWell(
                           onTap: state.isSyncing
                               ? null
-                              : () => syncManager.syncNow(forceDue: true),
+                              : () => SyncFeedbackHandler.performSync(
+                                    context: context,
+                                    syncManager: syncManager,
+                                  ),
                           borderRadius: BorderRadius.circular(999),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -97,9 +100,11 @@ class AppShellScaffold extends StatelessWidget {
                                   ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  hasPending
-                                      ? 'Sync (${state.pendingCount})'
-                                      : 'Sync Now',
+                                  state.isSyncing
+                                      ? 'Syncing...'
+                                      : (hasPending
+                                          ? 'Sync (${state.pendingCount})'
+                                          : 'Sync Now'),
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
@@ -157,11 +162,6 @@ class AppShellScaffold extends StatelessWidget {
               icon: Icon(Icons.event_note_outlined),
               selectedIcon: Icon(Icons.event_note_rounded),
               label: 'Leave',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view_rounded),
-              label: 'Modules',
             ),
           ],
         ),

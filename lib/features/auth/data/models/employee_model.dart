@@ -57,6 +57,27 @@ class EmployeeModel extends Employee {
     );
   }
 
+  factory EmployeeModel.fromApiJson(Map<String, dynamic> json) {
+    return EmployeeModel(
+      employeeId: (json['employee_id'] ?? json['id'] ?? '') as String,
+      employeeName:
+          (json['employee_name'] ?? json['name'] ?? 'Syed Mohamed Afsal')
+              as String,
+      department: (json['department'] ?? 'Engineering') as String,
+      designation:
+          (json['designation'] ?? json['role'] ?? 'Flutter Developer') as String,
+      officeId: (json['office_id'] ?? 'OFF_KOCHI_01') as String,
+      officeName:
+          (json['office_name'] ?? 'Teqbae Innovations, Kochi') as String,
+      officeLatitude:
+          (json['office_latitude'] as num?)?.toDouble() ?? 10.0159,
+      officeLongitude:
+          (json['office_longitude'] as num?)?.toDouble() ?? 76.3419,
+      companyTimezone:
+          (json['company_timezone'] ?? 'Asia/Kolkata') as String,
+    );
+  }
+
   Map<String, dynamic> toDbMap() {
     return {
       'employee_id': employeeId,

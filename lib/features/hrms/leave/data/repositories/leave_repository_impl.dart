@@ -107,42 +107,49 @@ class LeaveRepositoryImpl implements LeaveRepository {
     required String reason,
   }) async {
     try {
-      final now = _clock();
-      final request = LeaveRequestModel(
-        localId: _uuid.v4(),
-        employeeId: _config.defaultEmployeeId,
-        leaveType: leaveType,
-        startDate: startDate,
-        endDate: endDate,
-        isHalfDay: isHalfDay,
-        reason: reason,
-        approvalStatus: LeaveApprovalStatus.pending,
-        syncStatus: RecordSyncStatus.pending,
-        createdAt: now,
-        updatedAt: now,
+      // 1. Connectivity requirement: Leave submission requires connectivity
+      final isConnected = await _networkInfo.isConnected;
+      if (!isConnected) {
+        return const FailureResult(
+          NetworkFailure(
+            'Leave submission requires an active internet connection. Previously loaded requests remain viewable offline.',
+          ),
+        );
+      }
+
+      final localId = _uuid.v4();
+      final idempotencyKey = _uuid.v4();
+
+      final payload = {
+        'client_id': localId,
+        'employee_id': _config.defaultEmployeeId,
+        'leave_type': leaveType.name,
+        'start_date': LeaveRequestModel.formatDateKey(startDate),
+        'end_date': LeaveRequestModel.formatDateKey(endDate),
+        'is_half_day': isHalfDay,
+        'reason': reason,
+      };
+
+      // 2. Submit directly to remote server with idempotency key
+      final remoteCreated = await _remoteDataSource.submitLeave(
+        payload: payload,
+        idempotencyKey: idempotencyKey,
       );
 
-      final operation = SyncOperation(
-        id: _uuid.v4(),
-        entityType: LeaveSyncHandler.kEntityType,
-        entityId: request.localId,
-        operationType: LeaveSyncHandler.kOpApplyLeave,
-        payload: request.toApiPayload(),
-        idempotencyKey: _uuid.v4(),
-        status: SyncQueueStatus.pending,
-        retryCount: 0,
-        createdAt: now,
-        updatedAt: now,
+      // 3. Persist the successfully created leave request locally for offline viewing
+      await _localDataSource.saveRequest(
+        request: remoteCreated,
+        pendingDaysDelta: remoteCreated.requestedDays,
       );
 
-      await _localDataSource.saveRequestAndEnqueue(
-        request: request,
-        syncOperation: operation,
-        pendingDaysDelta: request.requestedDays,
-      );
-      unawaited(_syncManager.notifyQueueChanged());
-
-      return Success(request);
+      return Success(remoteCreated);
+    } on ValidationException catch (e) {
+      // Handle server-side validation rejection (e.g. HTTP 422 Unprocessable Entity)
+      return FailureResult(ValidationFailure(e.message));
+    } on ServerException catch (e) {
+      return FailureResult(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return FailureResult(NetworkFailure(e.message));
     } on CacheException catch (e) {
       return FailureResult(CacheFailure(e.message));
     } catch (e) {

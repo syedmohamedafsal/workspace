@@ -9,6 +9,7 @@ import '../../domain/usecases/check_in.dart';
 import '../../domain/usecases/check_out.dart';
 import '../../domain/usecases/get_attendance_history.dart';
 import '../../domain/usecases/get_today_attendance.dart';
+import '../../domain/usecases/reset_today_attendance.dart';
 import 'attendance_event.dart';
 import 'attendance_state.dart';
 
@@ -18,16 +19,19 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     required GetAttendanceHistory getAttendanceHistory,
     required CheckIn checkIn,
     required CheckOut checkOut,
+    ResetTodayAttendance? resetTodayAttendance,
     required SyncManager syncManager,
   })  : _getTodayAttendance = getTodayAttendance,
         _getAttendanceHistory = getAttendanceHistory,
         _checkIn = checkIn,
         _checkOut = checkOut,
+        _resetTodayAttendance = resetTodayAttendance,
         _syncManager = syncManager,
         super(const AttendanceState()) {
     on<LoadAttendanceRequested>(_onLoadAttendance);
     on<CheckInSubmitted>(_onCheckIn);
     on<CheckOutSubmitted>(_onCheckOut);
+    on<ResetTodayAttendanceRequested>(_onResetTodayAttendance);
 
     // Reload local records whenever background sync completes so sync badges
     // update live without extra user interaction.
@@ -43,6 +47,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final GetAttendanceHistory _getAttendanceHistory;
   final CheckIn _checkIn;
   final CheckOut _checkOut;
+  final ResetTodayAttendance? _resetTodayAttendance;
   final SyncManager _syncManager;
 
   StreamSubscription<SyncSnapshot>? _syncSubscription;
@@ -129,15 +134,20 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         final historyResult = await _getAttendanceHistory(
           const GetAttendanceHistoryParams(),
         );
+        final rawName = event.employeeName?.trim();
+        final firstName = (rawName != null && rawName.isNotEmpty)
+            ? rawName.split(' ').first
+            : 'there';
         final dist = record.checkInDistanceMeters != null
-            ? ' (${record.checkInDistanceMeters!.round()}m from office)'
+            ? ' • ${record.checkInDistanceMeters!.round()}m from office'
             : '';
         emit(
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             todayRecord: record,
             history: historyResult.dataOrNull ?? state.history,
-            feedbackMessage: 'Checked in successfully$dist.',
+            feedbackMessage:
+                'Hey $firstName, take a coffee and code, and don\'t forget to commit! ☕💻🚀$dist',
             feedbackSequence: state.feedbackSequence + 1,
           ),
         );
@@ -183,15 +193,22 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         final historyResult = await _getAttendanceHistory(
           const GetAttendanceHistoryParams(),
         );
-        final dist = record.checkOutDistanceMeters != null
-            ? ' (${record.checkOutDistanceMeters!.round()}m from office)'
-            : '';
+        final rawName = event.employeeName?.trim();
+        final firstName = (rawName != null && rawName.isNotEmpty)
+            ? rawName.split(' ').first
+            : 'bro';
+        final isOver = event.isOfficeHoursOver ??
+            (record.workedDuration != null &&
+                record.workedDuration!.inHours >= 8);
+        final sweetMessage = isOver
+            ? 'Checked out! Office hours are over, enjoy your own time and recharge, $firstName! 🌙🛋️'
+            : 'Checked out! It\'s office time bro, take care of your personal errands! 👍';
         emit(
           state.copyWith(
             status: AttendanceViewStatus.loaded,
             todayRecord: record,
             history: historyResult.dataOrNull ?? state.history,
-            feedbackMessage: 'Checked out successfully$dist.',
+            feedbackMessage: sweetMessage,
             feedbackSequence: state.feedbackSequence + 1,
           ),
         );
@@ -206,6 +223,30 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _onResetTodayAttendance(
+    ResetTodayAttendanceRequested event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    if (_resetTodayAttendance != null) {
+      await _resetTodayAttendance(const NoParams());
+    }
+    _lastCheckInSuccessAt = null;
+    _lastCheckOutSuccessAt = null;
+    final historyResult = await _getAttendanceHistory(
+      const GetAttendanceHistoryParams(),
+    );
+    emit(
+      state.copyWith(
+        status: AttendanceViewStatus.loaded,
+        clearTodayRecord: true,
+        history: historyResult.dataOrNull ?? state.history,
+        feedbackMessage:
+            'Today\'s attendance reset! You can now test Check In and Check Out again fresh. 🔄',
+        feedbackSequence: state.feedbackSequence + 1,
+      ),
     );
   }
 

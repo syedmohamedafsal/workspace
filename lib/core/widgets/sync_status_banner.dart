@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../sync/sync_manager.dart';
 import '../sync/sync_status.dart';
+import 'sync_feedback_handler.dart';
 
 /// Understated top status bar showing offline state, pending sync count,
 /// or actionable sync retry.
@@ -26,7 +27,7 @@ class SyncStatusBanner extends StatelessWidget {
         }
 
         final (bgColor, borderColor, fgColor, icon, message, actionLabel, onAction) =
-            _resolveBannerStyle(state);
+            _resolveBannerStyle(state, context);
 
         return Container(
           width: double.infinity,
@@ -84,7 +85,7 @@ class SyncStatusBanner extends StatelessWidget {
   }
 
   (Color, Color, Color, IconData, String, String?, VoidCallback?)
-      _resolveBannerStyle(SyncSnapshot state) {
+      _resolveBannerStyle(SyncSnapshot state, BuildContext context) {
     if (!state.isOnline) {
       final suffix = state.totalUnsynced > 0
           ? ' • ${state.totalUnsynced} pending sync'
@@ -121,7 +122,11 @@ class SyncStatusBanner extends StatelessWidget {
         Icons.error_outline_rounded,
         '$issueCount event(s) rejected or failed to sync',
         'Retry',
-        () => syncManager.retryFailed(),
+        () => SyncFeedbackHandler.performSync(
+          context: context,
+          syncManager: syncManager,
+          retryFailed: true,
+        ),
       );
     }
 
@@ -132,7 +137,10 @@ class SyncStatusBanner extends StatelessWidget {
       Icons.cloud_upload_outlined,
       '${state.pendingCount} event(s) waiting to sync',
       'Sync Now',
-      () => syncManager.syncNow(forceDue: true),
+      () => SyncFeedbackHandler.performSync(
+        context: context,
+        syncManager: syncManager,
+      ),
     );
   }
 }

@@ -90,8 +90,8 @@ class LeaveRequestModel extends LeaveRequest {
       'server_id': serverId,
       'employee_id': employeeId,
       'leave_type': leaveType.name,
-      'start_date': _formatDate(startDate),
-      'end_date': _formatDate(endDate),
+      'start_date': formatDateKey(startDate),
+      'end_date': formatDateKey(endDate),
       'is_half_day': isHalfDay ? 1 : 0,
       'reason': reason,
       'approval_status': approvalStatus.name,
@@ -108,14 +108,14 @@ class LeaveRequestModel extends LeaveRequest {
       'client_id': localId,
       'employee_id': employeeId,
       'leave_type': leaveType.name,
-      'start_date': _formatDate(startDate),
-      'end_date': _formatDate(endDate),
+      'start_date': formatDateKey(startDate),
+      'end_date': formatDateKey(endDate),
       'is_half_day': isHalfDay,
       'reason': reason,
     };
   }
 
-  static String _formatDate(DateTime date) {
+  static String formatDateKey(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
     final m = date.month.toString().padLeft(2, '0');
     final d = date.day.toString().padLeft(2, '0');

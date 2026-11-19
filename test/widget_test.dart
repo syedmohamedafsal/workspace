@@ -144,12 +144,12 @@ void main() {
     expect(find.text('Leave Balance'), findsOneWidget);
     expect(find.text('Apply Leave'), findsOneWidget);
 
-    // Navigate to Modules tab
-    await tester.tap(find.text('Modules'));
-    await tester.pumpAndSettle();
-    expect(find.text('REBS Platform Modules'), findsOneWidget);
-    expect(find.text('CRM'), findsOneWidget);
-    expect(find.text('Accounts'), findsOneWidget);
+    // Verify Modules tab is removed from bottom navigation bar
+    expect(find.text('Modules'), findsNothing);
+    final navBar = find.byType(NavigationBar);
+    expect(find.descendant(of: navBar, matching: find.text('Dashboard')), findsOneWidget);
+    expect(find.descendant(of: navBar, matching: find.text('Attendance')), findsOneWidget);
+    expect(find.descendant(of: navBar, matching: find.text('Leave')), findsOneWidget);
   });
 
   testWidgets(

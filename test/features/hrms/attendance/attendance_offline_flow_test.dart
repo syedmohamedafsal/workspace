@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rebs/core/config/app_config.dart';
 import 'package:rebs/core/database/app_database.dart';
+import 'package:rebs/core/error/exceptions.dart';
 import 'package:rebs/core/error/failures.dart';
 import 'package:rebs/core/location/location_models.dart';
 import 'package:rebs/core/location/location_service.dart';
@@ -59,6 +60,7 @@ void main() {
     db = AppDatabase(
       databaseFactoryOverride: databaseFactoryFfi,
       pathOverride: inMemoryDatabasePath,
+      seedSampleAttendance: false,
     );
     queueDataSource = SyncQueueDataSource(db);
     localDataSource = AttendanceLocalDataSourceImpl(
@@ -265,5 +267,106 @@ void main() {
     final todayAfterSync = await repository.getTodayAttendance();
     expect(todayAfterSync.dataOrNull?.syncStatus, RecordSyncStatus.synced);
     expect(todayAfterSync.dataOrNull?.serverId, 'srv-att-42');
+  });
+
+  test(
+      'handles server 409 duplicate rejection and marks local record as conflict/rejected without blocking queue',
+      () async {
+    final checkInResult = await repository.checkIn();
+    expect(checkInResult.isSuccess, isTrue);
+
+    // Stub 409 Conflict response
+    when(
+      () => remoteDataSource.sendCheckIn(
+        payload: any(named: 'payload'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenThrow(
+      const ConflictException(
+        'Attendance already recorded for this date on server',
+      ),
+    );
+
+    when(
+      () => remoteDataSource.fetchHistory(
+        employeeId: any(named: 'employeeId'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => []);
+
+    networkInfo.goOnline();
+    await syncManager.syncNow(forceDue: true);
+
+    final record = await repository.getTodayAttendance();
+    expect(record.dataOrNull?.syncStatus, RecordSyncStatus.conflict);
+    expect(record.dataOrNull?.syncError, contains('Attendance already recorded'));
+
+    // Queue status reflects conflict isolation
+    final counts = await queueDataSource.getCounts();
+    expect(counts.conflict, 1);
+    expect(counts.pending, 0);
+  });
+
+  test(
+      'reconciles timeout-after-server-accept when retry receives 409 conflict',
+      () async {
+    final checkInResult = await repository.checkIn();
+    final localRecord = checkInResult.dataOrNull!;
+
+    // 1st attempt: server accepts but client network times out
+    when(
+      () => remoteDataSource.sendCheckIn(
+        payload: any(named: 'payload'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenThrow(
+      const NetworkException('Connection timeout waiting for server response'),
+    );
+
+    networkInfo.goOnline();
+    await syncManager.syncNow(forceDue: true);
+
+    // Remains pending with retryCount > 0
+    var counts = await queueDataSource.getCounts();
+    expect(counts.pending, 1);
+
+    // 2nd attempt (retry): server responds with 409 conflict because it already created the record
+    when(
+      () => remoteDataSource.sendCheckIn(
+        payload: any(named: 'payload'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenThrow(
+      const ConflictException('Attendance already recorded for this date'),
+    );
+
+    // Reconciliation check confirms the server accepted it on flight 1
+    when(
+      () => remoteDataSource.fetchHistory(
+        employeeId: any(named: 'employeeId'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        AttendanceRecordModel(
+          localId: localRecord.localId,
+          serverId: 'srv-att-reconciled-99',
+          employeeId: localRecord.employeeId,
+          date: localRecord.date,
+          checkInAt: localRecord.checkInAt,
+          status: AttendanceStatus.checkedIn,
+          syncStatus: RecordSyncStatus.synced,
+          createdAt: localRecord.createdAt,
+          updatedAt: localRecord.updatedAt,
+        ),
+      ],
+    );
+
+    await syncManager.syncNow(forceDue: true);
+
+    // Reconciled successfully as synced!
+    final today = await repository.getTodayAttendance();
+    expect(today.dataOrNull?.syncStatus, RecordSyncStatus.synced);
+    expect(today.dataOrNull?.serverId, 'srv-att-reconciled-99');
   });
 }

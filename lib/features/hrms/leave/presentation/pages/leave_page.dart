@@ -49,6 +49,18 @@ class _LeavePageState extends State<LeavePage> {
         );
   }
 
+  Future<void> _confirmCancelLeave(LeaveRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => _CancelLeaveConfirmationDialog(request: request),
+    );
+
+    if (confirmed == true && mounted) {
+      context.read<LeaveBloc>().add(CancelLeaveSubmitted(request.localId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -227,9 +239,7 @@ class _LeavePageState extends State<LeavePage> {
                         _LeaveRequestCard(
                           request: request,
                           onCancel: request.canCancel
-                              ? () => context
-                                  .read<LeaveBloc>()
-                                  .add(CancelLeaveSubmitted(request.localId))
+                              ? () => _confirmCancelLeave(request)
                               : null,
                         ),
                         const SizedBox(height: 10),
@@ -320,22 +330,53 @@ class _LeaveBalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSick = balance.leaveType == LeaveType.sick;
-    final accent = isSick ? const Color(0xFF0EA5E9) : const Color(0xFF10B981);
-    final softBg = isSick ? const Color(0xFFF0F9FF) : const Color(0xFFECFDF5);
+    final primaryColor =
+        isSick ? const Color(0xFF0284C7) : const Color(0xFF059669);
+    final secondaryColor =
+        isSick ? const Color(0xFF38BDF8) : const Color(0xFF34D399);
+    final borderColor =
+        isSick ? const Color(0xFFBAE6FD) : const Color(0xFFBBF7D0);
     final icon = isSick
-        ? Icons.medical_services_outlined
-        : Icons.wb_sunny_outlined;
+        ? Icons.medical_services_rounded
+        : Icons.beach_access_rounded;
     final ratio = balance.totalDays > 0
         ? (balance.remainingDays / balance.totalDays).clamp(0.0, 1.0)
         : 0.0;
+    final percent = (ratio * 100).round();
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.cardShadow,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isSick
+              ? const [
+                  Color(0xFFF0F9FF),
+                  Color(0xFFF8FAFC),
+                  Colors.white,
+                ]
+              : const [
+                  Color(0xFFF0FDF4),
+                  Color(0xFFF8FAFC),
+                  Colors.white,
+                ],
+          stops: const [0.0, 0.45, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,13 +384,24 @@ class _LeaveBalanceCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: softBg,
-                  borderRadius: BorderRadius.circular(9),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [primaryColor, secondaryColor],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.28),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, size: 17, color: accent),
+                child: Icon(icon, size: 17, color: Colors.white),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -358,9 +410,32 @@ class _LeaveBalanceCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: primaryColor.withValues(alpha: 0.22),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  '$percent%',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: primaryColor,
                   ),
                 ),
               ),
@@ -374,9 +449,11 @@ class _LeaveBalanceCard extends StatelessWidget {
               Text(
                 _fmt(balance.remainingDays),
                 style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
+                  fontSize: 27,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.8,
+                  height: 1.0,
                 ),
               ),
               const SizedBox(width: 5),
@@ -384,30 +461,73 @@ class _LeaveBalanceCard extends StatelessWidget {
                 'days left',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 5,
-              backgroundColor: const Color(0xFFF1F5F9),
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
+          Container(
+            height: 6,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final fillWidth = (constraints.maxWidth * ratio)
+                    .clamp(6.0, constraints.maxWidth);
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: fillWidth,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryColor, secondaryColor],
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.35),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 7),
-          Text(
-            'Used ${_fmt(balance.usedDays)} • Pending ${_fmt(balance.pendingDays)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11.5,
-              color: AppTheme.textMuted,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  'Used ${_fmt(balance.usedDays)} • Pending ${_fmt(balance.pendingDays)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -433,133 +553,435 @@ class _LeaveRequestCard extends StatelessWidget {
     final days = request.requestedDays % 1 == 0
         ? request.requestedDays.toStringAsFixed(0)
         : request.requestedDays.toStringAsFixed(1);
+    final isSick = request.leaveType == LeaveType.sick;
 
-    final (accent, bg, fg) = switch (request.approvalStatus) {
+    final (badgeBg, badgeBorder, badgeFg, dotColor) =
+        switch (request.approvalStatus) {
       LeaveApprovalStatus.approved => (
-          const Color(0xFF10B981),
           const Color(0xFFF0FDF4),
-          const Color(0xFF166534),
+          const Color(0xFFBBF7D0),
+          const Color(0xFF15803D),
+          const Color(0xFF10B981),
         ),
       LeaveApprovalStatus.pending => (
-          const Color(0xFFF59E0B),
           const Color(0xFFFFFBEB),
-          const Color(0xFF92400E),
+          const Color(0xFFFDE68A),
+          const Color(0xFFB45309),
+          const Color(0xFFF59E0B),
         ),
       LeaveApprovalStatus.rejected => (
-          const Color(0xFFEF4444),
           const Color(0xFFFEF2F2),
-          const Color(0xFF991B1B),
+          const Color(0xFFFECACA),
+          const Color(0xFFB91C1C),
+          const Color(0xFFEF4444),
         ),
       LeaveApprovalStatus.cancelled => (
+          const Color(0xFFF8FAFC),
+          const Color(0xFFE2E8F0),
+          const Color(0xFF64748B),
           const Color(0xFF94A3B8),
-          const Color(0xFFF1F5F9),
-          const Color(0xFF475569),
         ),
     };
 
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.cardShadow,
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Icon + Type + Days Pill + Status Badge
+          Row(
             children: [
-              Container(width: 4, color: accent),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isSick
+                      ? const Color(0xFFF0F9FF)
+                      : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSick
+                        ? const Color(0xFFBAE6FD)
+                        : const Color(0xFFBBF7D0),
+                    width: 0.8,
+                  ),
+                ),
+                child: Icon(
+                  isSick
+                      ? Icons.medical_services_rounded
+                      : Icons.beach_access_rounded,
+                  size: 16,
+                  color: isSick
+                      ? const Color(0xFF0284C7)
+                      : const Color(0xFF059669),
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${request.leaveType.label} • $days ${days == '1' ? 'day' : 'days'}',
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: bg,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              request.approvalStatus.label,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: fg,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today_outlined,
-                            size: 13,
-                            color: AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            dateRange,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        request.reason,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        request.leaveType.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13.5,
-                          color: AppTheme.textPrimary,
-                          height: 1.35,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.2,
                         ),
                       ),
-                      if (onCancel != null) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: onCancel,
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.textSecondary,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              minimumSize: const Size(0, 30),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text('Cancel Request'),
-                          ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$days ${days == '1' ? 'day' : 'days'}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: badgeBorder,
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: dotColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      request.approvalStatus.label,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: badgeFg,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Date Range Row
+          Row(
+            children: [
+              const Icon(
+                Icons.calendar_today_outlined,
+                size: 13.5,
+                color: Color(0xFF64748B),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                dateRange,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Reason Body Text (clean, unboxed typography)
+          Text(
+            request.reason,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF475569),
+              height: 1.45,
+            ),
+          ),
+
+          // Cancel Request Action
+          if (onCancel != null) ...[
+            const SizedBox(height: 12),
+            const Divider(
+              height: 1,
+              thickness: 1,
+              color: Color(0xFFF1F5F9),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                key: ValueKey('cancel_leave_button_${request.localId}'),
+                onPressed: onCancel,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'Cancel Request',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 7,
+                  ),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CancelLeaveConfirmationDialog extends StatelessWidget {
+  const _CancelLeaveConfirmationDialog({required this.request});
+
+  final LeaveRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('d MMM yyyy');
+    final dateRange = request.startDate == request.endDate
+        ? fmt.format(request.startDate)
+        : '${fmt.format(request.startDate)} – ${fmt.format(request.endDate)}';
+    final days = request.requestedDays % 1 == 0
+        ? request.requestedDays.toStringAsFixed(0)
+        : request.requestedDays.toStringAsFixed(1);
+    final isSick = request.leaveType == LeaveType.sick;
+
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Red warning badge
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFECACA),
+                width: 1.2,
+              ),
+            ),
+            child: const Icon(
+              Icons.event_busy_rounded,
+              size: 26,
+              color: Color(0xFFDC2626),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Cancel Leave Request?',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Are you sure you want to cancel this leave application? Your available balance will be restored immediately.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Leave Details Summary Box
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isSick
+                          ? Icons.medical_services_rounded
+                          : Icons.beach_access_rounded,
+                      size: 16,
+                      color: isSick
+                          ? const Color(0xFF0284C7)
+                          : const Color(0xFF059669),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${request.leaveType.label} • $days ${days == '1' ? 'day' : 'days'}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      dateRange,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                ),
+                if (request.reason.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '"${request.reason}"',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const ValueKey('cancel_dialog_keep_button'),
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475569),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Keep Leave',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  key: const ValueKey('cancel_dialog_confirm_button'),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: const Text(
+                    'Yes, Cancel',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

@@ -145,12 +145,17 @@ class AttendanceRecordModel extends AttendanceRecord {
     };
   }
 
-  Map<String, dynamic> toCheckInPayload({required String companyTimezone}) {
+  Map<String, dynamic> toCheckInPayload({
+    required String companyTimezone,
+    String? eventId,
+  }) {
     return {
+      'event_id': eventId ?? localId,
       'client_id': localId,
       'employee_id': employeeId,
-      'event_type': 'check_in',
+      'event_type': 'CHECK_IN',
       'date': formatDateKey(date),
+      'attendance_date': formatDateKey(date),
       'timestamp': checkInAt?.toUtc().toIso8601String(),
       'check_in_at': checkInAt?.toIso8601String(),
       'latitude': checkInLatitude,
@@ -162,13 +167,18 @@ class AttendanceRecordModel extends AttendanceRecord {
     };
   }
 
-  Map<String, dynamic> toCheckOutPayload({required String companyTimezone}) {
+  Map<String, dynamic> toCheckOutPayload({
+    required String companyTimezone,
+    String? eventId,
+  }) {
     return {
+      'event_id': eventId ?? localId,
       'client_id': localId,
       'server_id': serverId,
       'employee_id': employeeId,
-      'event_type': 'check_out',
+      'event_type': 'CHECK_OUT',
       'date': formatDateKey(date),
+      'attendance_date': formatDateKey(date),
       'timestamp': checkOutAt?.toUtc().toIso8601String(),
       'check_out_at': checkOutAt?.toIso8601String(),
       'latitude': checkOutLatitude,

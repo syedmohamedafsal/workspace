@@ -17,7 +17,9 @@ import '../../../../../core/sync/sync_manager.dart';
 import '../../../../../core/sync/sync_status.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/time/company_clock.dart';
+import '../../../../../core/widgets/attendance_dialogs.dart';
 import '../../../../../core/widgets/attendance_feedback_handler.dart';
+import '../../../../../core/widgets/sync_feedback_handler.dart';
 import '../../../../../core/widgets/sync_status_banner.dart';
 import '../../../../../core/widgets/sync_status_chip.dart';
 import '../../../../auth/domain/entities/employee.dart';
@@ -163,13 +165,32 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                           AttendanceViewStatus.submitting,
                       onCheckIn: () {
                         context.read<AttendanceBloc>().add(
-                              CheckInSubmitted(workLocation: officeName),
+                              CheckInSubmitted(
+                                workLocation: officeName,
+                                employeeName: employee?.employeeName ??
+                                    defaults.employeeName,
+                              ),
                             );
                       },
-                      onCheckOut: () {
-                        context
-                            .read<AttendanceBloc>()
-                            .add(const CheckOutSubmitted());
+                      onCheckOut: () async {
+                        final confirmed =
+                            await AttendanceDialogs.showCheckOutConfirmation(
+                          context: context,
+                          employeeName:
+                              employee?.employeeName ?? defaults.employeeName,
+                          companyTimezone: companyTimezone,
+                          checkInAt: attendanceState.todayRecord?.checkInAt,
+                          workedDuration:
+                              attendanceState.todayRecord?.workedDuration,
+                        );
+                        if (confirmed == true && context.mounted) {
+                          context.read<AttendanceBloc>().add(
+                                CheckOutSubmitted(
+                                  employeeName: employee?.employeeName ??
+                                      defaults.employeeName,
+                                ),
+                              );
+                        }
                       },
                       onOpenLocationSimulator: () =>
                           LocationSimulatorSheet.show(
@@ -179,6 +200,14 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                         officeLatitude: officeLat,
                         officeLongitude: officeLng,
                       ),
+                      onResetToday: () {
+                        context.read<AttendanceBloc>().add(
+                              ResetTodayAttendanceRequested(
+                                employeeName: employee?.employeeName ??
+                                    defaults.employeeName,
+                              ),
+                            );
+                      },
                     ),
                     // Offline / pending sync banner when applicable
                     Padding(
@@ -306,6 +335,7 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
     required this.onCheckIn,
     required this.onCheckOut,
     required this.onOpenLocationSimulator,
+    required this.onResetToday,
   });
 
   final Employee? employee;
@@ -324,6 +354,7 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
   final VoidCallback onOpenLocationSimulator;
+  final VoidCallback onResetToday;
 
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -452,7 +483,10 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                         child: InkWell(
                           onTap: sync.isSyncing
                               ? null
-                              : () => syncManager.syncNow(forceDue: true),
+                              : () => SyncFeedbackHandler.performSync(
+                                    context: context,
+                                    syncManager: syncManager,
+                                  ),
                           borderRadius: BorderRadius.circular(999),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -722,6 +756,9 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                             isSubmitting: isSubmitting,
                             onCheckIn: onCheckIn,
                             onCheckOut: onCheckOut,
+                            onResetToday: onResetToday,
+                            employeeName: employee?.employeeName ??
+                                sl<AppConfig>().employeeConfig.employeeName,
                             officeName: officeName,
                             officeLatitude: officeLatitude,
                             officeLongitude: officeLongitude,
@@ -768,6 +805,8 @@ class _SwipeableAttendancePanel extends StatefulWidget {
     required this.isSubmitting,
     required this.onCheckIn,
     required this.onCheckOut,
+    required this.onResetToday,
+    required this.employeeName,
     required this.officeName,
     required this.officeLatitude,
     required this.officeLongitude,
@@ -787,6 +826,8 @@ class _SwipeableAttendancePanel extends StatefulWidget {
   final bool isSubmitting;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
+  final VoidCallback onResetToday;
+  final String employeeName;
   final String officeName;
   final double officeLatitude;
   final double officeLongitude;
@@ -952,10 +993,22 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                             ],
                             isLoading:
                                 widget.isSubmitting && !widget.isCheckedIn,
-                            isDisabled: widget.isSubmitting ||
-                                widget.isCheckedIn ||
+                            isDisabled: widget.isCheckedIn ||
                                 widget.isCheckedOut,
-                            onTap: widget.onCheckIn,
+                            onTap: () {
+                              if (!widget.isCheckedIn && !widget.isCheckedOut) {
+                                widget.onCheckIn();
+                              } else {
+                                AttendanceDialogs.showCheckInWelcomeDialog(
+                                  context: context,
+                                  employeeName: widget.employeeName,
+                                  checkInAt: widget.todayRecord?.checkInAt,
+                                  officeName: widget.officeName,
+                                  distanceMeters: widget
+                                      .todayRecord?.checkInDistanceMeters,
+                                );
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -978,10 +1031,22 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                             ],
                             isLoading:
                                 widget.isSubmitting && widget.isCheckedIn,
-                            isDisabled: widget.isSubmitting ||
-                                !widget.isCheckedIn ||
+                            isDisabled: !widget.isCheckedIn ||
                                 widget.isCheckedOut,
-                            onTap: widget.onCheckOut,
+                            onTap: () {
+                              if (widget.isCheckedIn && !widget.isCheckedOut) {
+                                widget.onCheckOut();
+                              } else {
+                                AttendanceDialogs.showCheckOutConfirmation(
+                                  context: context,
+                                  employeeName: widget.employeeName,
+                                  companyTimezone: 'Asia/Kolkata',
+                                  checkInAt: widget.todayRecord?.checkInAt,
+                                  workedDuration:
+                                      widget.todayRecord?.workedDuration,
+                                );
+                              }
+                            },
                           ),
                         ),
                       ],
@@ -1035,12 +1100,14 @@ class _SwipeableAttendancePanelState extends State<_SwipeableAttendancePanel> {
                             ),
                           ),
                         ),
-                        if (widget.todayRecord != null) ...[
-                          const SizedBox(width: 8),
-                          SyncStatusChip(
-                            status: widget.todayRecord!.syncStatus,
+                        if (widget.todayRecord != null)
+                          InkWell(
+                            onLongPress: widget.onResetToday,
+                            borderRadius: BorderRadius.circular(6),
+                            child: SyncStatusChip(
+                              status: widget.todayRecord!.syncStatus,
+                            ),
                           ),
-                        ],
                       ],
                     ),
                   ],
@@ -1207,7 +1274,7 @@ class _AttendanceColorTile extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: isDisabled ? null : onTap,
+        onTap: isLoading ? null : onTap,
         borderRadius: BorderRadius.circular(14),
         child: Ink(
           padding: const EdgeInsets.fromLTRB(12, 10, 10, 12),
@@ -1300,89 +1367,220 @@ class _LeaveBalanceQuotaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSick = balance.leaveType == LeaveType.sick;
-    final accent = isSick ? const Color(0xFF0EA5E9) : const Color(0xFF10B981);
-    final softBg = isSick ? const Color(0xFFF0F9FF) : const Color(0xFFECFDF5);
+    final primaryColor =
+        isSick ? const Color(0xFF0284C7) : const Color(0xFF059669);
+    final secondaryColor =
+        isSick ? const Color(0xFF38BDF8) : const Color(0xFF34D399);
+    final borderColor =
+        isSick ? const Color(0xFFBAE6FD) : const Color(0xFFBBF7D0);
     final icon = isSick
-        ? Icons.medical_services_outlined
-        : Icons.wb_sunny_outlined;
+        ? Icons.medical_services_rounded
+        : Icons.beach_access_rounded;
     final ratio = balance.totalDays > 0
         ? (balance.remainingDays / balance.totalDays).clamp(0.0, 1.0)
         : 0.0;
+    final percent = (ratio * 100).round();
 
-    return _ElevatedSurface(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: softBg,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, size: 17, color: accent),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.go(AppRoutes.leave),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isSick
+                  ? const [
+                      Color(0xFFF0F9FF),
+                      Color(0xFFF8FAFC),
+                      Colors.white,
+                    ]
+                  : const [
+                      Color(0xFFF0FDF4),
+                      Color(0xFFF8FAFC),
+                      Colors.white,
+                    ],
+              stops: const [0.0, 0.45, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  balance.leaveType.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Vibrant Gradient Icon + Label + Percent Pill
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [primaryColor, secondaryColor],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.28),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(icon, size: 17, color: Colors.white),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      balance.leaveType.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: primaryColor.withValues(alpha: 0.22),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      '$percent%',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Hero Number & "days left"
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    _fmtDays(balance.remainingDays),
+                    style: const TextStyle(
+                      fontSize: 27,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.8,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'days left',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Gradient Progress Bar
+              Container(
+                height: 6,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(999),
                 ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final fillWidth = (constraints.maxWidth * ratio)
+                        .clamp(6.0, constraints.maxWidth);
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        width: fillWidth,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [primaryColor, secondaryColor],
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.35),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Breakdown Footnote
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'Used ${_fmtDays(balance.usedDays)} of ${_fmtDays(balance.totalDays)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                _fmtDays(balance.remainingDays),
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'days left',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 5,
-              backgroundColor: const Color(0xFFF1F5F9),
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            'Used ${_fmtDays(balance.usedDays)} of ${_fmtDays(balance.totalDays)}',
-            style: const TextStyle(
-              fontSize: 11.5,
-              color: AppTheme.textMuted,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1788,34 +1986,49 @@ class _SectionHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-              letterSpacing: -0.2,
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.3,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        GestureDetector(
-          onTap: onAction,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                actionLabel,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1575C8),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onAction,
+            borderRadius: BorderRadius.circular(999),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: const Color(0xFFBFDBFE),
+                  width: 0.8,
                 ),
               ),
-              const SizedBox(width: 2),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: Color(0xFF1575C8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ],

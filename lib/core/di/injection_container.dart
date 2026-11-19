@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../features/auth/data/datasources/auth_local_datasource.dart';
+import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/clear_employee_session.dart';
@@ -17,6 +18,7 @@ import '../../features/hrms/attendance/domain/usecases/check_in.dart';
 import '../../features/hrms/attendance/domain/usecases/check_out.dart';
 import '../../features/hrms/attendance/domain/usecases/get_attendance_history.dart';
 import '../../features/hrms/attendance/domain/usecases/get_today_attendance.dart';
+import '../../features/hrms/attendance/domain/usecases/reset_today_attendance.dart';
 import '../../features/hrms/attendance/presentation/bloc/attendance_bloc.dart';
 import '../../features/hrms/leave/data/datasources/leave_local_datasource.dart';
 import '../../features/hrms/leave/data/datasources/leave_remote_datasource.dart';
@@ -94,6 +96,9 @@ void _registerAuthModule({AuthRepository? authRepositoryOverride}) {
   sl.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSourceImpl(sl()),
   );
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSourceImpl(sl()),
+  );
 
   // Repository
   sl.registerLazySingleton<AuthRepository>(
@@ -102,6 +107,7 @@ void _registerAuthModule({AuthRepository? authRepositoryOverride}) {
         AuthRepositoryImpl(
           localDataSource: sl(),
           employeeConfig: sl<AppConfig>().employeeConfig,
+          remoteDataSource: sl(),
         ),
   );
 
@@ -159,6 +165,7 @@ void _registerAttendanceModule() {
   sl.registerLazySingleton(() => GetAttendanceHistory(sl()));
   sl.registerLazySingleton(() => CheckIn(sl()));
   sl.registerLazySingleton(() => CheckOut(sl()));
+  sl.registerLazySingleton(() => ResetTodayAttendance(sl()));
 
   // Presentation BLoC
   sl.registerFactory(
@@ -167,6 +174,7 @@ void _registerAttendanceModule() {
       getAttendanceHistory: sl(),
       checkIn: sl(),
       checkOut: sl(),
+      resetTodayAttendance: sl(),
       syncManager: sl(),
     ),
   );
@@ -206,7 +214,13 @@ void _registerLeaveModule() {
   // Use cases
   sl.registerLazySingleton(() => GetLeaveRequests(sl()));
   sl.registerLazySingleton(() => GetLeaveBalances(sl()));
-  sl.registerLazySingleton(() => ApplyLeave(sl()));
+  sl.registerLazySingleton(
+    () => ApplyLeave(
+      repository: sl(),
+      companyClock: sl(),
+      config: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => CancelLeave(sl()));
 
   // Presentation BLoC
