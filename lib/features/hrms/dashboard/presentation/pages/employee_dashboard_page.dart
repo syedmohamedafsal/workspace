@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,8 +48,14 @@ class EmployeeDashboardPage extends StatefulWidget {
   State<EmployeeDashboardPage> createState() => _EmployeeDashboardPageState();
 }
 
-class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
+class _EmployeeDashboardPageState extends State<EmployeeDashboardPage>
+    with SingleTickerProviderStateMixin {
   Timer? _elapsedTicker;
+  late final AnimationController _entranceController;
+  late final Animation<double> _logoProgressAnimation;
+  late final Animation<double> _onlinePillFadeAnimation;
+  late final Animation<double> _detailsFadeAnimation;
+  late final Animation<Offset> _detailsSlideAnimation;
 
   @override
   void initState() {
@@ -60,11 +67,49 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
         if (mounted) setState(() {});
       },
     );
+
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _logoProgressAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: const Interval(0.0, 0.65, curve: Curves.easeInOutCubic),
+    );
+
+    _onlinePillFadeAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: const Interval(0.45, 0.8, curve: Curves.easeIn),
+    );
+
+    _detailsFadeAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+    );
+
+    _detailsSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    if (isTest) {
+      _entranceController.value = 1.0;
+    } else {
+      _entranceController.forward();
+    }
   }
 
   @override
   void dispose() {
     _elapsedTicker?.cancel();
+    _entranceController.dispose();
     super.dispose();
   }
 
@@ -157,6 +202,10 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                       children: [
                         // Curved blue top header + overlapping office & check-in/out card
                         _TopHeaderAndOverviewStack(
+                          logoAnimation: _logoProgressAnimation,
+                          onlinePillAnimation: _onlinePillFadeAnimation,
+                          detailsFadeAnimation: _detailsFadeAnimation,
+                          detailsSlideAnimation: _detailsSlideAnimation,
                           employee: employee,
                       officeName: officeName,
                       officeLatitude: officeLat,
@@ -217,85 +266,97 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
                             );
                       },
                     ),
-                    // Offline / pending sync banner when applicable
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SyncStatusBanner(syncManager: syncManager),
-                      ),
-                    ),
-                    // Available Leave Balance cards
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                      child: _SectionHeader(
-                        title: 'Available Leave Balance',
-                        actionLabel: 'Apply Leave',
-                        onAction: () => context.go(AppRoutes.leave),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: visibleBalances.isEmpty
-                          ? const _EmptyBlockCard(
-                              icon: Icons.event_available_outlined,
-                              title: 'Leave balance unavailable',
-                              subtitle:
-                                  'Pull down to refresh once connectivity returns.',
-                            )
-                          : Row(
-                              children: [
-                                for (var i = 0;
-                                    i < visibleBalances.length;
-                                    i++) ...[
-                                  if (i > 0) const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _LeaveBalanceQuotaCard(
-                                      balance: visibleBalances[i],
-                                    ),
-                                  ),
-                                ],
-                              ],
+                    // Below details: Fade and slide in smoothly
+                    FadeTransition(
+                      opacity: _detailsFadeAnimation,
+                      child: SlideTransition(
+                        position: _detailsSlideAnimation,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Offline / pending sync banner when applicable
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SyncStatusBanner(syncManager: syncManager),
+                              ),
                             ),
-                    ),
-                    // Latest five attendance records
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-                      child: _SectionHeader(
-                        title: 'Recent Attendance',
-                        actionLabel: 'View all',
-                        onAction: () => context.go(AppRoutes.attendance),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: latestFive.isEmpty
-                          ? _EmptyBlockCard(
-                              icon: Icons.schedule_outlined,
-                              title: 'No attendance records yet',
-                              subtitle:
-                                  'Tap Check In above to start logging your workday.',
-                              actionLabel: 'Refresh',
-                              onAction: () => _loadData(refreshRemote: true),
-                            )
-                          : Column(
-                              children: [
-                                for (var i = 0; i < latestFive.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 10),
-                                  _RecentAttendanceRow(
-                                    record: latestFive[i],
-                                    companyTimezone: companyTimezone,
-                                    onTap: () => AttendanceDetailSheet.show(
-                                      context,
-                                      latestFive[i],
-                                      companyTimezone: companyTimezone,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            // Available Leave Balance cards
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                              child: _SectionHeader(
+                                title: 'Available Leave Balance',
+                                actionLabel: 'Apply Leave',
+                                onAction: () => context.go(AppRoutes.leave),
+                              ),
                             ),
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: visibleBalances.isEmpty
+                                  ? const _EmptyBlockCard(
+                                      icon: Icons.event_available_outlined,
+                                      title: 'Leave balance unavailable',
+                                      subtitle:
+                                          'Pull down to refresh once connectivity returns.',
+                                    )
+                                  : Row(
+                                      children: [
+                                        for (var i = 0;
+                                            i < visibleBalances.length;
+                                            i++) ...[
+                                          if (i > 0) const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _LeaveBalanceQuotaCard(
+                                              balance: visibleBalances[i],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                            ),
+                            // Latest five attendance records
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                              child: _SectionHeader(
+                                title: 'Recent Attendance',
+                                actionLabel: 'View all',
+                                onAction: () => context.go(AppRoutes.attendance),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: latestFive.isEmpty
+                                  ? _EmptyBlockCard(
+                                      icon: Icons.schedule_outlined,
+                                      title: 'No attendance records yet',
+                                      subtitle:
+                                          'Tap Check In above to start logging your workday.',
+                                      actionLabel: 'Refresh',
+                                      onAction: () => _loadData(refreshRemote: true),
+                                    )
+                                  : Column(
+                                      children: [
+                                        for (var i = 0; i < latestFive.length; i++) ...[
+                                          if (i > 0) const SizedBox(height: 10),
+                                          _RecentAttendanceRow(
+                                            record: latestFive[i],
+                                            companyTimezone: companyTimezone,
+                                            onTap: () => AttendanceDetailSheet.show(
+                                              context,
+                                              latestFive[i],
+                                              companyTimezone: companyTimezone,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -329,6 +390,10 @@ class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
 
 class _TopHeaderAndOverviewStack extends StatelessWidget {
   const _TopHeaderAndOverviewStack({
+    this.logoAnimation,
+    this.onlinePillAnimation,
+    this.detailsFadeAnimation,
+    this.detailsSlideAnimation,
     required this.employee,
     required this.officeName,
     required this.officeLatitude,
@@ -348,6 +413,10 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
     required this.onResetToday,
   });
 
+  final Animation<double>? logoAnimation;
+  final Animation<double>? onlinePillAnimation;
+  final Animation<double>? detailsFadeAnimation;
+  final Animation<Offset>? detailsSlideAnimation;
   final Employee? employee;
   final String officeName;
   final double officeLatitude;
@@ -459,87 +528,56 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset(
-                    'assets/images/teqbae_logo_transparent.png',
-                    height: 30,
-                    fit: BoxFit.contain,
-                  ),
-                  StreamBuilder<SyncSnapshot>(
-                    stream: syncManager.statusStream,
-                    initialData: syncManager.currentSnapshot,
-                    builder: (context, snapshot) {
-                      final sync = snapshot.data ?? const SyncSnapshot();
-                      final isOnline = sync.isOnline;
-                      final bg = isOnline
-                          ? const Color(0xFFDDFAC8)
-                          : const Color(0xFFFEF3C7);
-                      final fg = isOnline
-                          ? const Color(0xFF3F7D20)
-                          : const Color(0xFF92400E);
-                      final label = sync.isSyncing
-                          ? 'Syncing...'
-                          : isOnline
-                              ? (sync.pendingCount > 0
-                                  ? 'Sync (${sync.pendingCount})'
-                                  : 'Online')
-                              : 'Offline';
+                  logoAnimation != null
+                      ? AnimatedBuilder(
+                          animation: logoAnimation!,
+                          builder: (context, child) {
+                            final progress = logoAnimation!.value;
+                            if (progress >= 1.0) {
+                              return child!;
+                            }
+                            final size = MediaQuery.sizeOf(context);
+                            final startY = (size.height * 0.38) - 12;
+                            final startX = (size.width / 2) - 16 - 56;
+                            final currentX = (1.0 - progress) * startX;
+                            final currentY = (1.0 - progress) * startY;
+                            final scale = 1.0 + (1.0 - progress) * 0.6;
 
-                      return Material(
-                        color: bg,
-                        borderRadius: BorderRadius.circular(999),
-                        child: InkWell(
-                          onTap: sync.isSyncing
-                              ? null
-                              : () => SyncFeedbackHandler.performSync(
-                                    context: context,
-                                    syncManager: syncManager,
-                                  ),
-                          borderRadius: BorderRadius.circular(999),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (sync.isSyncing)
-                                  SizedBox(
-                                    width: 13,
-                                    height: 13,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: fg,
-                                    ),
-                                  )
-                                else
-                                  Icon(
-                                    isOnline
-                                        ? Icons.swap_vert_rounded
-                                        : Icons.wifi_off_rounded,
-                                    size: 16,
-                                    color: fg,
-                                  ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: fg,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            return Transform.translate(
+                              offset: Offset(currentX, currentY),
+                              child: Transform.scale(
+                                scale: scale,
+                                alignment: Alignment.topLeft,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Image.asset(
+                            'assets/images/teqbae_logo_transparent.png',
+                            height: 30,
+                            fit: BoxFit.contain,
                           ),
+                        )
+                      : Image.asset(
+                          'assets/images/teqbae_logo_transparent.png',
+                          height: 30,
+                          fit: BoxFit.contain,
                         ),
-                      );
-                    },
-                  ),
+                  onlinePillAnimation != null
+                      ? FadeTransition(
+                          opacity: onlinePillAnimation!,
+                          child: _buildOnlinePill(),
+                        )
+                      : _buildOnlinePill(),
                 ],
               ),
-              const SizedBox(height: 18),
-              // Row 2: Employee Avatar + Name / Department • ID + Quick Action Circle
+              Builder(
+                builder: (context) {
+                  final detailsContent = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 18),
+                      // Row 2: Employee Avatar + Name / Department • ID + Quick Action Circle
               Row(
                 children: [
                   Container(
@@ -790,9 +828,100 @@ class _TopHeaderAndOverviewStack extends StatelessWidget {
                 ),
               ),
             ],
+          );
+
+                  if (detailsFadeAnimation == null) return detailsContent;
+
+                  return FadeTransition(
+                    opacity: detailsFadeAnimation!,
+                    child: detailsSlideAnimation != null
+                        ? SlideTransition(
+                            position: detailsSlideAnimation!,
+                            child: detailsContent,
+                          )
+                        : detailsContent,
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOnlinePill() {
+    return StreamBuilder<SyncSnapshot>(
+      stream: syncManager.statusStream,
+      initialData: syncManager.currentSnapshot,
+      builder: (context, snapshot) {
+        final sync = snapshot.data ?? const SyncSnapshot();
+        final isOnline = sync.isOnline;
+        final bg = isOnline
+            ? const Color(0xFFDDFAC8)
+            : const Color(0xFFFEF3C7);
+        final fg = isOnline
+            ? const Color(0xFF3F7D20)
+            : const Color(0xFF92400E);
+        final label = sync.isSyncing
+            ? 'Syncing...'
+            : isOnline
+                ? (sync.pendingCount > 0
+                    ? 'Sync (${sync.pendingCount})'
+                    : 'Online')
+                : 'Offline';
+
+        return Material(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          child: InkWell(
+            onTap: sync.isSyncing
+                ? null
+                : () => SyncFeedbackHandler.performSync(
+                      context: context,
+                      syncManager: syncManager,
+                    ),
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 6,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (sync.isSyncing)
+                    SizedBox(
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: fg,
+                      ),
+                    )
+                  else
+                    Icon(
+                      isOnline
+                          ? Icons.swap_vert_rounded
+                          : Icons.wifi_off_rounded,
+                      size: 16,
+                      color: fg,
+                    ),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

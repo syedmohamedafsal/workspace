@@ -18,6 +18,7 @@ class AppConfig {
     this.maxRetryDelay = const Duration(minutes: 5),
     this.allowedAttendanceRadiusMeters = 200.0,
     this.employeeConfig = const PreconfiguredEmployeeConfig(),
+    this.splashDuration = const Duration(seconds: 3),
   }) : _apiBaseUrl = apiBaseUrl;
 
   final String? _apiBaseUrl;
@@ -27,6 +28,7 @@ class AppConfig {
   final Duration baseRetryDelay;
   final Duration maxRetryDelay;
   final double allowedAttendanceRadiusMeters;
+  final Duration splashDuration;
 
   /// Preconfigured employee, office coordinates, and company timezone settings.
   final PreconfiguredEmployeeConfig employeeConfig;

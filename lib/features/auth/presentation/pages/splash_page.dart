@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/app_config.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/router/app_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -21,6 +26,10 @@ class _SplashPageState extends State<SplashPage> {
   static const Color _brandDark = Color(0xFF0A0B0D);
   static const Color _brandEmerald = Color(0xFF22B57D);
 
+  Timer? _splashTimer;
+  bool _timerElapsed = false;
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -28,6 +37,39 @@ class _SplashPageState extends State<SplashPage> {
     if (authBloc.state is AuthInitial) {
       authBloc.add(const AuthSessionInitializeRequested());
     }
+
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    final splashDuration = isTest
+        ? Duration.zero
+        : (sl.isRegistered<AppConfig>()
+            ? sl<AppConfig>().splashDuration
+            : const Duration(seconds: 3));
+
+    if (splashDuration == Duration.zero) {
+      _timerElapsed = true;
+      _checkAndNavigate();
+    } else {
+      _splashTimer = Timer(splashDuration, () {
+        if (!mounted) return;
+        _timerElapsed = true;
+        _checkAndNavigate();
+      });
+    }
+  }
+
+  void _checkAndNavigate() {
+    if (_navigated || !_timerElapsed || !mounted) return;
+    final state = context.read<AuthBloc>().state;
+    if (state is AuthAuthenticated) {
+      _navigated = true;
+      context.go(AppRoutes.dashboard);
+    }
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -39,7 +81,7 @@ class _SplashPageState extends State<SplashPage> {
       child: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            context.go(AppRoutes.dashboard);
+            _checkAndNavigate();
           }
         },
         builder: (context, state) {
